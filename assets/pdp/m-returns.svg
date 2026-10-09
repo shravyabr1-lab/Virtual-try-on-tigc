@@ -1,0 +1,20 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Component 1">
+<g id="Icon Part">
+</g>
+<path id="Rectangle 6681" d="M28.7188 17V29.5H1.71875V8.5H16.5782" stroke="#2B2627"/>
+<rect id="Icon Part_2" x="6" y="24" width="5.4375" height="2.5" stroke="#2B2627"/>
+<path id="Rectangle 6682" d="M12.75 8.625V17.0459L9.69824 15.4395L9.4707 15.3193L9.24023 15.4355L6 17.0635V8.625H12.75Z" stroke="#2B2627"/>
+<g id="Frame 1261155212">
+<circle id="Ellipse 95" cx="23.625" cy="9.375" r="8.375" fill="#A30013"/>
+<g id="Frame" clip-path="url(#clip0_0_197)">
+<path id="Vector" d="M25.4689 8.1595H27.7569L26.2989 6.70062C25.8295 6.23123 25.2448 5.89368 24.6036 5.7219C23.9624 5.55012 23.2873 5.55017 22.6461 5.72205C22.0049 5.89392 21.4203 6.23156 20.951 6.70102C20.4817 7.17048 20.1442 7.75522 19.9725 8.39646M21.7811 10.5905H19.4931V12.8785M19.4931 10.5905L20.9506 12.0494C21.42 12.5188 22.0047 12.8563 22.6459 13.0281C23.2871 13.1999 23.9622 13.1998 24.6034 13.028C25.2446 12.8561 25.8292 12.5184 26.2985 12.049C26.7679 11.5795 27.1053 10.9948 27.277 10.3535M27.7569 5.8715V8.15858" stroke="white" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_0_197">
+<rect width="11" height="11" fill="white" transform="translate(18.125 3.875)"/>
+</clipPath>
+</defs>
+</svg>

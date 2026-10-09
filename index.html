@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIGC Virtual Try-On Prototype</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Gloock&family=Inter:ital,wght@1,300&display=swap">
+<style>
+  :root{
+    --font:'Pretendard',-apple-system,'Segoe UI',sans-serif;
+    --feat:"salt" 1,"lnum" 1,"tnum" 1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#e9e9ec}
+  body{display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:var(--font);font-feature-settings:var(--feat);-webkit-font-smoothing:antialiased}
+  .stage{width:360px;height:800px;transform-origin:center center;flex:none}
+  .device{position:relative;width:360px;height:800px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .abs{position:absolute}
+  img{display:block}
+  p,span,b{white-space:nowrap}
+
+  /* ---------- Browser header (status bar + url pill) ---------- */
+  .browser{left:0;top:0;width:360px;height:73px;background:#fff;border-bottom:1px solid #e8e9ea;z-index:20}
+  .time{left:24px;top:7px;font:500 14px/20px 'Roboto',sans-serif;letter-spacing:.14px;color:#0b090a;font-feature-settings:"ss02" 1,"dlig" 1,"lnum" 1,"pnum" 1}
+  .sb-wifi{left:290px;top:10px;width:17px;height:17px}
+  .sb-signal{left:306px;top:10px;width:17px;height:17px}
+  .sb-batt{left:328px;top:11px;width:8px;height:15px}
+  .pill{left:16px;top:37px;width:328px;height:32px;border-radius:100px;background:#eeeff1;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 10px}
+  .pill img{width:7.875px;height:9px}
+  .pill span{font:400 16px/20px 'Roboto',sans-serif;letter-spacing:.16px;color:#0b090a;font-feature-settings:"dlig" 1,"lnum" 1,"pnum" 1}
+
+  /* ---------- App bar ---------- */
+  .appbar{left:0;top:73px;width:360px;height:48px;background:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:19}
+  .appbar .l{display:flex;align-items:center;gap:16px;width:193px}
+  .appbar .r{display:flex;align-items:center;gap:16px}
+
+  /* ---------- Carousel ---------- */
+  .carousel{left:0;top:124px;width:360px;height:543px;overflow:hidden;z-index:1}
+  .scroller{overflow-anchor:none;position:absolute;inset:0;overflow-y:auto;scroll-snap-type:y proximity;scrollbar-width:none}
+  .scroller::-webkit-scrollbar{display:none}
+  .strip{position:relative;width:360px}
+  .slide{position:relative;width:360px;overflow:hidden;scroll-snap-align:start}
+  .slide img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hl{position:absolute;left:0;top:0;width:149px;height:580px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .hl::before{content:"";position:absolute;inset:0;background:rgba(54,54,54,.77)}
+  .hl .col{position:absolute;left:50%;top:164px;transform:translateX(-50%);width:121px;display:flex;flex-direction:column;gap:20px}
+  .hl h3{font:600 18px/22px var(--font);color:#fff;width:114px;white-space:normal}
+  .hl .row{display:flex;flex-direction:column;gap:6px}
+  .hl .row .t{display:flex;flex-direction:column;gap:2px}
+  .hl .k{font:400 12px/17px var(--font);color:#b9b6b7}
+  .hl .v{font:600 16px/23px var(--font);color:#fff;white-space:normal}
+  .hl .ln{display:block;width:100%;height:.2px}
+
+  .ind{left:332px;top:24px;width:4px;height:120px;background:#ebebeb;z-index:3}
+  .ind i{position:absolute;left:0;top:0;width:4px;height:30px;background:#191516}
+  .trust{left:0;top:454px;width:360px;height:32px;padding:8px;background:#f8f6ed;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;gap:4px;z-index:3}
+  .trust .av{display:flex}
+  .trust .av img{width:14px;height:14px;margin-right:-4px}
+  .trust .av img:last-child{margin-right:0}
+  .trust span{font:400 12px/15px var(--font);color:#2b2627}
+  .trust span b{font-weight:600}
+
+  /* ---------- Try on ---------- */
+  .tryon{left:269px;top:410px;width:75px;height:28px;display:flex;align-items:center;justify-content:center;gap:4px;padding:0 10px 1px;
+    border:.5px solid #cb28bd;border-radius:4px;cursor:pointer;z-index:2;background:none;
+    background-image:linear-gradient(-87.43deg,rgba(203,40,189,.04) 20.165%,rgba(215,74,177,.04) 49.918%,rgba(106,82,229,.04) 89.589%),linear-gradient(90deg,#fff,#fff);
+    transition:transform .12s ease,width .65s cubic-bezier(.4,0,.2,1),left .65s cubic-bezier(.4,0,.2,1),top .65s cubic-bezier(.4,0,.2,1),opacity .3s ease}
+  .result .tryon{width:97px;left:247px;top:414px}
+  /* screen 4 (generating): no Try on chip */
+  .device.loading:not(.result) .tryon{opacity:0;pointer-events:none}
+  .tryon:active{transform:scale(.95)}
+  .tryon .ic{position:relative;width:16px;height:16px;overflow:hidden;flex:none}
+  .tryon .ic img{position:absolute;width:auto;height:auto;max-width:none}
+  .tryon .ic img{display:block}
+  .tryon .scan{position:absolute;left:-4.364px;top:1.45px;width:4.364px;height:13.091px;
+    background-image:linear-gradient(90deg,rgba(129,25,120,0) 0%,rgba(129,25,120,.15) 20%,rgba(159,39,127,.85) 50%,rgba(129,25,120,.15) 80%,rgba(62,40,171,0) 100%);
+    animation:scan 2s ease-in-out infinite}
+  @keyframes scan{0%{transform:translateX(0)}100%{transform:translateX(20.73px)}}
+  .tryon .lbl{position:relative;width:35px;height:14px;flex:none;transition:width .65s cubic-bezier(.4,0,.2,1)}
+  .result .tryon .lbl{width:57px}
+  .tryon .lbl .txt{position:absolute;left:0;top:0;white-space:nowrap;transition:opacity .45s ease}
+  .tryon .lbl .txt.b{opacity:0}
+  .result .tryon .lbl .txt.a{opacity:0}
+  .result .tryon .lbl .txt.b{opacity:1}
+  .tryon .txt{font:500 12px/14px var(--font);text-align:center;color:transparent;
+    background-image:linear-gradient(-87.6deg,#811978 10.247%,#9f277f 59.835%,#3e28ab 99.506%);-webkit-background-clip:text;background-clip:text}
+
+  /* ---------- Content sheet ---------- */
+  .sheet{left:0;top:602px;width:360px;height:198px;background:#fff;z-index:2}
+  .sheet .handle{position:absolute;left:16px;top:0;width:328px;height:12px}
+  .pr{position:absolute;left:16px;top:16px;width:328px;height:23px;display:flex;align-items:center;justify-content:space-between}
+  .pr .pd{display:flex;align-items:center;gap:6px}
+  .pr .p{font:600 16px/23px var(--font);color:#0b090a}
+  .pr .o{font:500 14px/18px var(--font);color:#999495;text-decoration:line-through;font-feature-settings:"case" 1,"salt" 1,"lnum" 1,"tnum" 1}
+  .pr .d{font:500 14px/18px var(--font);color:#008040}
+  .pr .rt{display:flex;align-items:center;gap:2px;height:17px}
+  .pr .rt .s{width:10px;height:10px}
+  .pr .rt .rd{display:flex;align-items:center;gap:4px}
+  .pr .rt .rd b{font:600 12px/17px var(--font);color:#191415}
+  .pr .rt .rd u{display:block;width:1px;height:8px;background:#d4d3d3}
+  .pr .rt .rd span{font:400 12px/17px var(--font);color:#191415}
+
+  /* ---------- CTA bar ---------- */
+  .ctabar{left:0;top:636px;width:360px;height:164px;z-index:10;background:#fff}
+  .ctabar .top{position:absolute;left:0;top:0;width:360px;height:104px;border-radius:6px 6px 0 0;overflow:hidden;background:#fff}
+  .offers{position:absolute;left:0;top:0;width:360px;height:40px;background:#170205;overflow:hidden}
+  .benefit{position:absolute;bottom:0;width:264px;height:313px}
+  .benefit i{position:absolute;left:50%;top:calc(50% + 18.8px);transform:translate(-50%,-50%);width:264px;height:326.597px;
+    background:url(assets/benefit.png) top left/648.1px 648.1px no-repeat;
+    -webkit-mask:url(assets/benefit-mask.svg) no-repeat;mask:url(assets/benefit-mask.svg) no-repeat;
+    -webkit-mask-size:463.049px 508.211px;mask-size:463.049px 508.211px}
+  .benefit.a{right:0}
+  .benefit.a i{-webkit-mask-position:.162px 35.774px;mask-position:.162px 35.774px}
+  .benefit.b{left:-24px;transform:rotate(180deg) scaleY(-1)}
+  .benefit.b i{-webkit-mask-position:-199.21px 35.774px;mask-position:-199.21px 35.774px}
+  .ell{position:absolute;left:calc(50% + 2.67px);top:calc(50% + .72px);width:311.33px;height:234.177px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center}
+  .ell div{position:relative;width:277.536px;height:169.829px;transform:scaleY(-1) rotate(-165.43deg)}
+  .ell img{position:absolute;inset:-58.88% -36.03%;width:auto;height:auto;max-width:none}
+  .offer{position:absolute;left:20px;top:12px;width:320px;height:16px;display:flex;align-items:center;gap:2px}
+  .offer .coin{position:relative;width:14px;height:14px;overflow:hidden;flex:none}
+  .offer .coin img{position:absolute;left:-23.94%;top:-23.94%;width:147.88%;height:147.88%;max-width:none}
+  .offer p{flex:1;font:400 11px/16px var(--font);color:#d4d3d3}
+  .offer a{font:500 11px/16px var(--font);color:#d4d3d3;text-decoration:underline;text-underline-position:from-font;cursor:pointer}
+  .cta{position:absolute;left:0;top:40px;width:360px;height:64px;padding:8px 16px;background:#fff}
+  .btn{position:relative;width:328px;height:48px;overflow:hidden;background:#c90016;cursor:pointer;border:0;display:block;-webkit-tap-highlight-color:transparent}
+  .btn span.l{position:absolute;left:calc(50% - 51px);top:17px;font:600 14px/14px var(--font);letter-spacing:1px;text-transform:uppercase;color:#fff;pointer-events:none}
+  .btn .rip{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:#7a000e;transform:scale(.01);opacity:1;pointer-events:none}
+  .btn .rip.go{animation:rip .6s ease-out forwards}
+  @keyframes rip{0%{transform:scale(.01);opacity:1}100%{transform:scale(30);opacity:1}}
+  .btn.pressed{background:#7a000e;transition:background .2s .35s}
+  .chrome{position:absolute;left:0;top:104px;width:360px;height:60px;background:#fff}
+  .chrome .m{position:absolute;left:13px;top:10px;width:335px;height:32px}
+  .chrome .m>*{position:absolute}
+  .tabs{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+  .tabs div{width:22.15px;height:22.15px;border:1px solid #80858a;border-radius:5.54px;display:flex;align-items:center;justify-content:center;font:700 12px/1 -apple-system,'SF Pro Display',sans-serif;color:#80858a}
+
+  /* ---------- Screen 2 : Virtual try on sheet ---------- */
+  .scrim{left:0;top:-6px;width:360px;height:667px;background:rgba(11,9,10,.55);z-index:30;opacity:0;pointer-events:none;transition:opacity .3s ease}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet2{left:0;top:283px;width:360px;height:457px;background:#fff;z-index:31;overflow:hidden;transform:translateY(520px);transition:transform .42s cubic-bezier(.22,.9,.3,1);visibility:hidden}
+  .sheet2.on{transform:none;visibility:visible}
+  .sheet2 .glow{position:absolute;width:154px;height:205px;transform:translate(-50%,-50%)}
+  .sheet2 .glow img{position:absolute;inset:-48.78% -64.94%;width:auto;height:auto;max-width:none;display:block}
+  .sheet2 .x{position:absolute;right:16px;top:16px;width:20px;height:20px;background:none;border:0;cursor:pointer;z-index:3}
+  .sheet2 .x svg{position:absolute;left:4px;top:4px;width:12px;height:12px}
+  .sheet2 .head{position:absolute;left:16px;top:32px;width:328px;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .sheet2 .ttl{display:flex;align-items:center;gap:8px}
+  .sheet2 .ttl .ic{position:relative;width:24px;height:24px;overflow:hidden;flex:none}
+  .sheet2 .ttl .ic img{position:absolute;max-width:none;display:block}
+  .sheet2 .ttl .scan{position:absolute;left:-6.545px;top:2.18px;width:6.545px;height:19.636px;
+    background-image:linear-gradient(90deg,rgba(129,25,120,0) 0%,rgba(129,25,120,.15) 20%,rgba(159,39,127,.85) 50%,rgba(129,25,120,.15) 80%,rgba(62,40,171,0) 100%);animation:scan2 2s ease-in-out infinite}
+  @keyframes scan2{0%{transform:translateX(0)}100%{transform:translateX(31px)}}
+  .sheet2 .ttl span.t{font:400 24px/23px 'Gloock',serif;color:transparent;background-image:linear-gradient(-84.06deg,#811978 10.247%,#9f277f 59.835%,#3e28ab 99.506%);-webkit-background-clip:text;background-clip:text;padding-bottom:1px}
+  .sheet2 .sub{width:328px;text-align:center;font:400 12px/17px var(--font);color:#0b090a;white-space:normal}
+
+  .cards{position:absolute;left:calc(50% - 133.3455px);top:146px;width:266.691px;height:180.001px}
+  .cards .w{position:absolute;top:8.25px;width:137.472px;height:171.753px;display:flex;align-items:center;justify-content:center}
+  .cards .w.r{left:calc(50% + 64.61px)}
+  .cards .w.l{left:calc(50% - 64.61px)}
+  .cards .w.r,.cards .w.l{margin-left:-68.736px}
+  .cards .card{border:1.316px solid #fff;border-radius:3.947px;overflow:hidden;box-shadow:1.316px 1.316px 3.947px rgba(0,0,0,.12);position:relative;background:#f8b4e4}
+  .cards .card .im{display:block;width:100px;height:150px;object-fit:cover}
+  .cards .card::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 3.947px 1.316px rgba(243,235,235,.24);pointer-events:none}
+  .cards .w.l .card{border-width:1.096px;border-radius:3.289px;box-shadow:1.096px 1.096px 3.289px rgba(0,0,0,.12)}
+  .cards .w.r .card{transform:rotate(16deg)}
+  .cards .w.l .card{transform:rotate(-16deg)}
+  .cards .c{position:absolute;left:50%;top:0;margin-left:-60px;z-index:2}
+  .cards .c .card{border-width:1.579px;border-radius:4.737px;box-shadow:1.579px 1.579px 4.737px rgba(0,0,0,.12)}
+  .cards .c .card .im{width:120px;height:180px}
+  .cards .c .card::after{box-shadow:inset 0 0 4.737px 1.579px rgba(243,235,235,.24)}
+  /* fan-out when the sheet opens, then a gentle idle sway */
+  .sheet2.on .w.r{animation:fanR .9s cubic-bezier(.2,.9,.25,1.15) .25s both, swayR 2s ease-in-out 1.15s infinite alternate}
+  .sheet2.on .w.l{animation:fanL .9s cubic-bezier(.2,.9,.25,1.15) .25s both, swayL 2s ease-in-out 1.15s infinite alternate}
+  .sheet2:not(.on) .w{transform:translateX(0) translateY(14px) scale(.92);opacity:0}
+  @keyframes fanR{0%{transform:translateX(-64.61px) translateY(14px) rotate(-16deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+  @keyframes fanL{0%{transform:translateX(64.61px) translateY(14px) rotate(16deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+  @keyframes swayR{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(-3px) rotate(2deg)}}
+  @keyframes swayL{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(-3px) rotate(-2deg)}}
+  .sheet2 .cta2{position:absolute;left:0;bottom:0;width:360px;height:64px;padding:8px 16px;background:#fff}
+
+  /* ---------- Screen 3 : Choose a photo ---------- */
+  .sheet2.out{transform:none;opacity:0;visibility:hidden;transition:opacity .2s ease,visibility 0s .2s}
+  .sheet2.s3{top:256px;height:484px;transform:translateY(28px);opacity:0;transition:transform .4s cubic-bezier(.22,.9,.3,1),opacity .3s ease,visibility 0s .3s}
+  .sheet2.s3.on{transform:none;opacity:1;transition:transform .4s cubic-bezier(.22,.9,.3,1) .05s,opacity .3s ease .05s,visibility 0s}
+  .s3 .col{position:absolute;left:16px;top:16px;width:328px;display:flex;flex-direction:column;align-items:center;gap:24px}
+  .s3 .ttl2{display:flex;align-items:center;gap:8px}
+  .s3 .ttl2 .t{font:400 20px/23px 'Gloock',serif;color:transparent;background-image:linear-gradient(-85.01deg,#811978 10.247%,#9f277f 59.835%,#3e28ab 99.506%);-webkit-background-clip:text;background-clip:text}
+  .s3 .pair{width:281.5px;display:flex;align-items:center;gap:32px}
+  .s3 .ph{position:relative;flex:none;border:1.316px solid #fff;border-radius:3.947px;overflow:hidden;box-shadow:1.316px 1.316px 3.947px rgba(0,0,0,.12);background:#f8b4e4}
+  .s3 .ph img{display:block;width:100px;height:150px;object-fit:cover}
+  .s3 .ph img+img{position:absolute;inset:0}
+  .s3 .ph::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 3.947px 1.316px rgba(243,235,235,.24);pointer-events:none}
+  .s3 .chev{position:relative;flex:none;width:17.5px;height:9px}
+  .s3 .chev img{position:absolute;left:-.75px;top:-.75px;width:19px;height:10.5px;max-width:none}
+  .s3 .info{width:328px;display:flex;flex-direction:column;align-items:center;gap:15px}
+  .s3 .info .h{width:100%;display:flex;flex-direction:column;gap:1px}
+  .s3 .info .h b{font:600 16px/23px var(--font);color:#0b090a;white-space:normal}
+  .s3 .info .h span{font:400 12px/17px var(--font);color:#999495;white-space:normal}
+  .s3 .opts{width:100%;display:flex;flex-direction:column;gap:8px}
+  .s3 .opt{width:100%;display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border:.5px solid #d4d3d3;cursor:pointer;text-align:left;font-family:var(--font);transition:background .12s}
+  .s3 .opt:active{background:#f7f6f6}
+  .s3 .opt .l{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+  .s3 .opt .l>img{width:24px;height:24px;flex:none}
+  .s3 .opt .tx{width:220px;display:flex;flex-direction:column;gap:2px}
+  .s3 .opt .tx b{font:600 12px/17px var(--font);color:#0b090a}
+  .s3 .opt .tx span{font:400 11px/16px var(--font);color:#999495}
+  .s3 .opt .go{width:12px;height:12px;flex:none;transform:scaleX(-1)}
+  .s3 .disc{font:400 12px/17px var(--font);color:#999495;text-align:center}
+  .s3 .disc p+p{margin-top:2px}
+
+  /* camera overlay (placeholder until the capture screens are designed) */
+  .cam{position:absolute;inset:0;background:#000;z-index:60;display:none;flex-direction:column}
+  .cam.on{display:flex}
+  .cam video{flex:1;width:100%;object-fit:cover;transform:scaleX(-1)}
+  .cam .bar{position:absolute;left:0;right:0;bottom:0;height:120px;display:flex;align-items:center;justify-content:center;background:linear-gradient(transparent,rgba(0,0,0,.6))}
+  .cam .shutter{width:64px;height:64px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.25);cursor:pointer}
+  .cam .shutter:active{background:#fff}
+  .cam .cx{position:absolute;left:16px;top:44px;width:32px;height:32px;border:0;border-radius:50%;background:rgba(0,0,0,.45);cursor:pointer}
+  .cam .cx svg{width:12px;height:12px}
+  .cam .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:500 13px/18px var(--font);text-align:center;padding:40px}
+
+  /* ---------- Screen 4 : generating (replaces first hero slide) ---------- */
+  .slide.gen{display:none;position:absolute;left:0;top:0;width:360px;height:500px;background:#fff;z-index:1;scroll-snap-align:none;border-radius:9.474px;
+    --r:-100px;-webkit-mask-image:radial-gradient(circle at 50% 235px,transparent var(--r),#000 calc(var(--r) + 110px));mask-image:radial-gradient(circle at 50% 235px,transparent var(--r),#000 calc(var(--r) + 110px))}
+  @property --r{syntax:'<length>';initial-value:-100px;inherits:false}
+  .device.loading .slide.gen{display:block}
+  .slide.gen.done{display:none!important}
+  /* reveal transition: result wipes in top→bottom behind a glowing scan edge */
+  .slide.gen.reveal{animation:iris 1.7s cubic-bezier(.45,0,.2,1) forwards}
+  @keyframes iris{from{--r:-100px}to{--r:360px}}
+  .gen.reveal .ct,.gen.reveal .gt{animation:fadeOut .45s ease forwards}
+  @keyframes fadeOut{to{opacity:0;transform:scale(1.04) translateY(-6px);filter:blur(3px)}}
+  .gen.reveal .roam{animation:converge .7s ease-in forwards}
+  @keyframes converge{to{scale:1.6;opacity:.9;translate:0 40px}}
+  .edge{position:absolute;left:0;top:0;width:360px;height:0;z-index:2;pointer-events:none;display:none}
+  .edge::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:linear-gradient(90deg,rgba(203,40,189,0),#cb28bd 20%,#d74ab1 50%,#6a52e5 80%,rgba(106,82,229,0));box-shadow:0 0 14px 3px rgba(203,40,189,.55)}
+  .edge::after{content:"";position:absolute;left:0;right:0;top:-70px;height:70px;background:linear-gradient(180deg,rgba(203,40,189,0),rgba(215,74,177,.28))}
+  .edge.go{display:block;animation:edgeMove 1.25s cubic-bezier(.65,0,.3,1) forwards,edgeFade 1.25s linear forwards}
+  @keyframes edgeMove{from{transform:translateY(0)}to{transform:translateY(500px)}}
+  @keyframes edgeFade{0%,90%{opacity:1}100%{opacity:0}}
+  .hero-img{transform-origin:50% 40%}
+  .hero-img.reveal{animation:sharp 2s cubic-bezier(.25,.6,.2,1) forwards}
+  @keyframes sharp{from{filter:blur(14px) saturate(.75) brightness(1.08);transform:scale(1.09)}60%{filter:blur(3px) saturate(.95) brightness(1.02)}to{filter:blur(0) saturate(1) brightness(1);transform:scale(1)}}
+  .gen .roam{position:absolute;left:calc(50% - 24px - 77px);top:calc(50% - 57.5px - 102.5px);width:154px;height:205px;opacity:.55;animation:roam 4.5s linear infinite,roamO 4.5s linear infinite}
+  .gen .roam img{position:absolute;left:-100px;top:-100px;width:354px;height:405px;max-width:none}
+  @keyframes roam{0%{translate:0 0;animation-timing-function:ease-in-out}20%{translate:48px 12px;animation-timing-function:ease-in-out}40%{translate:50px 88px;animation-timing-function:linear}60%{translate:-10px 88px;animation-timing-function:ease-in-out}80%{translate:-10px 14px;animation-timing-function:ease-in-out}100%{translate:0 0}}
+  @keyframes roamO{0%{opacity:.55;animation-timing-function:ease-in-out}20%{opacity:.78;animation-timing-function:ease-in-out}40%{opacity:.58;animation-timing-function:ease-in-out}60%{opacity:.76;animation-timing-function:ease-in-out}80%{opacity:.58;animation-timing-function:ease-in-out}100%{opacity:.55}}
+  .gen .ct{position:absolute;left:137px;top:228.75px;width:87px;height:42px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .gen .ct .ic{position:relative;width:24px;height:24px;overflow:hidden;flex:none;display:block}
+  .gen .ct .ic img{position:absolute;max-width:none;display:block}
+  .gen .ct .ic .scan{position:absolute;left:-6.545px;top:2.18px;width:6.545px;height:19.636px;background-image:linear-gradient(90deg,rgba(129,25,120,0) 0%,rgba(129,25,120,.15) 20%,rgba(159,39,127,.85) 50%,rgba(129,25,120,.15) 80%,rgba(62,40,171,0) 100%);animation:scan2 2s ease-in-out infinite}
+  .gen .ct p{position:absolute;left:43.5px;top:26px;width:95px;transform:translateX(-50%);text-align:center;font:600 11px/16px var(--font);color:#0b090a;opacity:0;animation:cp 4.5s linear infinite}
+  .gen .ct p:nth-of-type(1){animation-name:cp1}
+  .gen .ct p:nth-of-type(2){animation-name:cp2}
+  .gen .ct p:nth-of-type(3){animation-name:cp3}
+  @keyframes cp1{0%,30%{opacity:1}35%,95%{opacity:0}100%{opacity:1}}
+  @keyframes cp2{0%,30%{opacity:0}35%,63%{opacity:1}68%,100%{opacity:0}}
+  @keyframes cp3{0%,63%{opacity:0}68%,95%{opacity:1}100%{opacity:0}}
+  .gen .gt{position:absolute;left:78px;top:32px;font:600 16px/23px var(--font);color:transparent;background-image:linear-gradient(-80.87deg,#811978 73.508%,#9f277f 87.929%,#3e28ab 99.466%);-webkit-background-clip:text;background-clip:text}
+
+  /* ---------- Screen 6 : Image generated sheet ---------- */
+  .scrim{transition:opacity .3s ease,top .3s ease,height .3s ease}
+  .scrim.s6{top:73px;height:667px}
+  .sheet2.s6{top:219px;height:522px}
+  .s6 .glow7{position:absolute;left:-93px;top:-55px;width:530px;height:413px;pointer-events:none}
+  .s6 .gtitle{position:absolute;left:115px;top:16px;font:600 16px/23px var(--font);color:transparent;background-image:linear-gradient(-84.11deg,#811978 73.508%,#9f277f 87.929%,#3e28ab 99.466%);-webkit-background-clip:text;background-clip:text}
+  .s6 .quota{position:absolute;left:120px;top:51px;width:120px;height:20px;background:#fdfbf4}
+  .s6 .quota p{position:absolute;left:60px;top:4px;width:112px;transform:translateX(-50%);text-align:center;font:600 9px/12px 'Pretendard',sans-serif;letter-spacing:.4px;color:#3c3c3c}
+  .s6 .res{position:absolute;left:120px;top:83px;width:120px;height:160px;border:1.579px solid #fff;border-radius:4px;box-shadow:1.579px 1.579px 4.737px rgba(0,0,0,.12);overflow:hidden;background:#f8b4e4}
+  .s6 .res .a{position:absolute;left:0;top:-3.75%;width:100%;height:112.5%;max-width:none}
+  .s6 .res .b{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .s6 .dl{position:absolute;left:90.42px;top:130.42px;width:20px;height:20px;border-radius:13.333px;background:#fff;filter:drop-shadow(0 .833px 1.667px rgba(0,0,0,.08));border:0;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+  .s6 .dl:active{transform:scale(.9)}
+  .s6 .dl img{width:12.2225px;height:11.1111px;display:block}
+  .s6 .x{position:absolute;right:16px;top:16px;width:20px;height:20px;background:none;border:0;cursor:pointer;z-index:3}
+  .s6 .x svg{position:absolute;left:4px;top:4px;width:12px;height:12px}
+  .s6 .below{position:absolute;left:16px;top:263px;width:328px;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .s6 .cap{width:267px;height:17px;text-align:center;font:400 12px/17px var(--font);color:#999495;white-space:nowrap}
+  .s6 .opts{width:100%;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .s6 .opt{width:100%;height:60px;display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border:.5px solid #d4d3d3;cursor:pointer;text-align:left;font-family:var(--font);transition:background .12s}
+  .s6 .opt:active{background:#f7f6f6}
+  .s6 .opt .l{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+  .s6 .opt .l>img{width:24px;height:24px;flex:none}
+  .s6 .opt .tx{width:220px;display:flex;flex-direction:column;gap:2px}
+  .s6 .opt .tx b{font:600 12px/17px var(--font);color:#0b090a;white-space:pre}
+  .s6 .opt .tx span{font:400 11px/16px var(--font);color:#999495;white-space:pre}
+  .s6 .opt .go{width:12px;height:12px;flex:none;transform:scaleX(-1)}
+  .s6 .or{width:267px;height:17px;text-align:center;font:400 12px/17px var(--font);color:#999495}
+  /* mini card fan inside "Visit your virtual Closet" */
+  .s6 .mini{position:relative;width:52px;height:35.097px;flex:none}
+  .s6 .mini .w{position:absolute;top:1.61px;width:26.805px;height:33.489px;display:flex;align-items:center;justify-content:center}
+  .s6 .mini .w.r{left:calc(50% + 12.6px);margin-left:-13.4025px}
+  .s6 .mini .w.l{left:calc(50% - 12.6px);margin-left:-13.4025px}
+  .s6 .mini .card{position:relative;overflow:hidden;background:#f8b4e4;border:.257px solid #fff;border-radius:.77px;box-shadow:.257px .257px .77px rgba(0,0,0,.12)}
+  .s6 .mini .card img{display:block;width:19.498px;height:29.25px;object-fit:cover}
+  .s6 .mini .w.r .card{transform:rotate(16deg)}
+  .s6 .mini .w.l .card{transform:rotate(-16deg);border-width:.214px;border-radius:.641px}
+  .s6 .mini .c{position:absolute;left:50%;top:0;margin-left:-11.7px;z-index:2}
+  .s6 .mini .c .card{border-width:.308px;border-radius:.924px;box-shadow:.308px .308px .924px rgba(0,0,0,.12)}
+  .s6 .mini .c .card img{width:23.398px;height:35.097px}
+  .sheet2.on .s6mini-dummy{}
+  .sheet2.on .mini .w.r{animation:fanRm .9s cubic-bezier(.2,.9,.25,1.15) .3s both,swayRm 2s ease-in-out 1.2s infinite alternate}
+  .sheet2.on .mini .w.l{animation:fanLm .9s cubic-bezier(.2,.9,.25,1.15) .3s both,swayLm 2s ease-in-out 1.2s infinite alternate}
+  @keyframes fanRm{0%{transform:translateX(-12.6px) translateY(3px) rotate(-16deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+  @keyframes fanLm{0%{transform:translateX(12.6px) translateY(3px) rotate(16deg);opacity:0}25%{opacity:1}100%{transform:none;opacity:1}}
+  @keyframes swayRm{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(-1px) rotate(2deg)}}
+  @keyframes swayLm{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(-1px) rotate(-2deg)}}
+
+  /* ---------- Loader variants (screen 4) ---------- */
+  .gen .v2{position:absolute;inset:0;pointer-events:none}
+  .gen .ct .ic{display:none}
+  .gen .ct{top:334px;height:16px}
+  .gen .ct p{top:0}
+  .gen.reveal .v2{animation:fadeOut .5s ease forwards}
+  .ic2{position:relative;display:block;width:24px;height:24px;overflow:hidden;flex:none}
+  .ic2 img{position:absolute;max-width:none;display:block}
+  .ic2 .scan{position:absolute;left:-6.545px;top:2.18px;width:6.545px;height:19.636px;background-image:linear-gradient(90deg,rgba(129,25,120,0) 0%,rgba(129,25,120,.15) 20%,rgba(159,39,127,.85) 50%,rgba(129,25,120,.15) 80%,rgba(62,40,171,0) 100%);animation:scan2 2s ease-in-out infinite}
+
+  /* v2 : orbit */
+  .v2 .orb{position:absolute;left:120px;top:150px;width:120px;height:120px}
+  .v2 .pulse{position:absolute;inset:6px;border-radius:50%;border:1.5px solid rgba(159,39,127,.45);animation:pulse 2.4s ease-out infinite;opacity:0}
+  .v2 .pulse:nth-child(2){animation-delay:.8s}
+  .v2 .pulse:nth-child(3){animation-delay:1.6s}
+  @keyframes pulse{0%{transform:scale(.8);opacity:.8}100%{transform:scale(2);opacity:0}}
+  .v2 .spin{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(203,40,189,0) 0deg,#cb28bd 150deg,#6a52e5 290deg,rgba(106,82,229,0) 360deg);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 3px));animation:spinr 1.3s linear infinite}
+  @keyframes spinr{to{transform:rotate(360deg)}}
+  .v2 .disc{position:absolute;inset:12px;border-radius:50%;background:#fff;box-shadow:0 4px 20px rgba(159,39,127,.22),inset 0 0 0 1px rgba(159,39,127,.08);display:flex;align-items:center;justify-content:center;animation:bob 2.4s ease-in-out infinite alternate}
+  @keyframes bob{to{transform:scale(1.05)}}
+  .v2 .disc .ic2{transform:scale(2)}
+  .v2 .orbit{position:absolute;inset:-26px;animation:spinr 4.5s linear infinite}
+  .v2 .orbit.o2{inset:-44px;animation-duration:7s;animation-direction:reverse}
+  .v2 .orbit i{position:absolute;left:50%;top:-3px;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#cb28bd;box-shadow:0 0 8px 2px rgba(203,40,189,.5)}
+  .v2 .orbit.o2 i{width:5px;height:5px;margin-left:-2.5px;background:#6a52e5;box-shadow:0 0 8px 2px rgba(106,82,229,.5)}
+  .v2 .orbit i+i{top:auto;bottom:-3px;background:#d74ab1}
+  .v2 .sp{position:absolute;width:10px;height:10px;background:#cb28bd;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);opacity:0;animation:tw 2.2s ease-in-out infinite}
+  @keyframes tw{0%,100%{opacity:0;transform:scale(.3) rotate(0)}50%{opacity:.9;transform:scale(1) rotate(45deg)}}
+  @property --n{syntax:'<integer>';initial-value:0;inherits:false}
+  .v2 .pct{position:absolute;left:0;right:0;top:356px;text-align:center;font:600 22px/28px var(--font);color:transparent;background-image:linear-gradient(90deg,#811978,#9f277f 60%,#3e28ab);-webkit-background-clip:text;background-clip:text;animation:cnt 3.4s cubic-bezier(.3,0,.2,1) forwards;counter-reset:n var(--n)}
+  .v2 .pct::after{content:counter(n) "%"}
+  @keyframes cnt{from{--n:0}to{--n:99}}
+
+  /* ---------- Style Stories ---------- */
+  .stories{left:16px;top:480px;width:65px;height:78px;z-index:3;cursor:pointer;transition:opacity .3s ease,transform .12s ease;-webkit-tap-highlight-color:transparent}
+  .stories:active{transform:scale(.95)}
+  .device.loading:not(.result) .stories{opacity:0;pointer-events:none}
+    .stories .pic{position:absolute;left:5px;top:2px;width:56px;height:56px;border-radius:50%}
+  .stories .pic .ph{position:absolute;inset:2px;border-radius:50%;overflow:hidden;background:#fff}
+  .stories .pic img{position:absolute;max-width:none;display:block}
+  .stories .rg{position:absolute;left:5px;top:2px;width:56px;height:56px;border-radius:50%;background:linear-gradient(180deg,#ffc7cf 0%,#ea3b46 45%,#d20000 100%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2.3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 2.3px),#000 calc(100% - 2px));pointer-events:none}
+  .stories .lb{position:absolute;left:1px;top:60px;padding:2px 4px;background:#fff3f5;border:.5px solid rgba(210,0,0,.75);border-radius:2px;box-shadow:0 .5px 0 rgba(210,0,0,.5);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);font:600 9px/13px var(--font);color:#d20000;white-space:nowrap}
+
+  /* ---------- Screen 3 (updated) : choose a photo with card fan ---------- */
+  .scrim.s3{top:0}
+  .sheet2.s3{top:243px;height:497px}
+  .s3 .cards3{position:relative;width:220px;height:148.487px}
+  .s3 .cards3 .w{position:absolute;top:6.8px;width:113.404px;height:141.683px;display:flex;align-items:center;justify-content:center}
+  .s3 .cards3 .w.r{left:calc(50% + 53.3px);margin-left:-56.702px}
+  .s3 .cards3 .w.l{left:calc(50% - 53.3px);margin-left:-56.702px}
+  .s3 .cards3 .card{position:relative;overflow:hidden;background:#f8b4e4;border:1.085px solid #fff;border-radius:3.256px;box-shadow:1.085px 1.085px 3.256px rgba(0,0,0,.12)}
+  .s3 .cards3 .card img{display:block;width:82.492px;height:123.7px;object-fit:cover}
+  .s3 .cards3 .card::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 3.256px 1.085px rgba(243,235,235,.24);pointer-events:none}
+  .s3 .cards3 .w.r .card{transform:rotate(16deg)}
+  .s3 .cards3 .w.l .card{transform:rotate(-16deg);border-width:.905px;border-radius:2.714px;box-shadow:.905px .905px 2.714px rgba(0,0,0,.12)}
+  .s3 .cards3 .c{position:absolute;left:50%;top:0;margin-left:-50px;z-index:2}
+  .s3 .cards3 .c .card{border-width:1.303px;border-radius:3.908px;box-shadow:1.303px 1.303px 3.908px rgba(0,0,0,.12)}
+  .s3 .cards3 .c .card img{width:98.991px;height:148.487px}
+  .s3 .cards3 .c .card::after{box-shadow:inset 0 0 3.908px 1.303px rgba(243,235,235,.24)}
+  .s3 .info{gap:16px}
+
+  .tag{left:0;top:0;padding:6px 8px;background:linear-gradient(99.86deg,#d2a630 3.59%,#f4d583 98.5%);font:600 9px/12px var(--font);color:#fff;white-space:nowrap;z-index:3;opacity:0;transition:opacity .4s ease}
+  .result .tag,.qt .tag{opacity:1}
+
+  /* ---------- Virtual Closet page ---------- */
+  .closet{left:0;top:0;width:360px;height:800px;background:#fff;z-index:40;overflow:hidden;opacity:0;visibility:hidden;transition:opacity .22s ease,visibility 0s .22s}
+  .closet.on{opacity:1;visibility:visible;transition:opacity .22s ease,visibility 0s}
+  .sheet2.instant,.scrim.instant{transition:none!important}
+  .closet .cscroll{position:absolute;left:0;top:0;width:360px;height:800px;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+  .closet .cscroll::-webkit-scrollbar{display:none}
+  .closet .cpage{position:relative;width:360px;height:895px}
+  .closet .cglow{position:absolute;left:13px;top:116px;width:154px;height:205px;pointer-events:none}
+  .closet .cglow img{position:absolute;left:-100px;top:-100px;width:354px;height:405px;max-width:none;animation:cdrift 12s ease-in-out infinite}
+  @keyframes cdrift{0%,100%{transform:translate(0,0)}33%{transform:translate(70px,18px)}66%{transform:translate(120px,-6px)}}
+  .closet .ctop{position:absolute;left:0;top:0;width:360px;height:121px;background:#fff;z-index:3}
+  .closet .ctop .browser{z-index:auto}
+  .closet .plp{position:absolute;left:0;top:73px;width:360px;height:48px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+  .closet .plp .l{display:flex;align-items:center;gap:12px}
+  .closet .plp .back{width:24px;height:24px;border:0;background:none;padding:0;cursor:pointer}
+  .closet .plp .back img{width:24px;height:24px}
+  .closet .plp .t{font:500 12px/18px var(--font);color:#050001}
+  .closet .plp .bag{width:20px;height:20px}
+  .closet .bot{position:absolute;left:0;top:740px;width:360px;height:60px;background:#fff;z-index:3}
+  .closet .bot .chrome{top:0}
+  .closet .avt{position:absolute;left:16px;top:129px;width:328px;display:flex;flex-direction:column;align-items:center}
+  .closet .avt h2{font:500 16px/19px var(--font);color:transparent;background-image:linear-gradient(-79.2deg,#811978 73.508%,#9f277f 87.929%,#3e28ab 99.466%);-webkit-background-clip:text;background-clip:text;text-align:center}
+  .closet .avt .pic{position:relative;margin-top:12px;width:52px;height:52px;border:.586px solid #fff;border-radius:1.759px;box-shadow:.586px .586px 1.759px rgba(0,0,0,.12)}
+  .closet .avt .pic .im{position:absolute;inset:0;overflow:hidden;border-radius:1.759px}
+  .closet .avt .pic .im img{position:absolute;left:-.28%;top:-3.67%;width:100%;height:150%;max-width:none}
+  .closet .avt .edit{position:absolute;left:37.41px;top:38.41px;width:18px;height:18px;border-radius:12px;background:#fff;filter:drop-shadow(0 .75px 1.5px rgba(0,0,0,.08));border:0;padding:0;cursor:pointer}
+  .closet .avt .edit img{position:absolute;left:4.5px;top:4.5px;width:9px;height:9px}
+  .closet .quota{position:absolute;left:120px;top:228px;width:120px;height:20px;background:#fdfbf4}
+  .closet .quota p{position:absolute;left:60px;top:4px;width:112px;transform:translateX(-50%);text-align:center;font:600 9px/12px 'Pretendard',sans-serif;letter-spacing:.4px;color:#3c3c3c}
+  .closet .ylt{position:absolute;left:16px;top:264px;font:600 16px/23px var(--font);color:#0b090a}
+  .closet .grid{position:absolute;left:16px;top:303px;width:328px;display:grid;grid-template-columns:160px 160px;gap:16px 8px}
+  .closet .look{position:relative;width:160px;height:240px;overflow:hidden;background:#f8b4e4;transition:opacity .25s ease,transform .25s ease}
+  .closet .look>img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .closet .look.gone{opacity:0;transform:scale(.92)}
+  .closet .look .rm,.closet .look .add{position:absolute;border:0;padding:0;border-radius:16px;background:#fff;cursor:pointer;filter:drop-shadow(0 .5px 1px rgba(0,0,0,.08))}
+  .closet .look .rm{left:140px;top:8px;width:12px;height:12px}
+  .closet .look .rm img{position:absolute;left:50%;top:16.67%;height:66.66%;aspect-ratio:1;transform:translateX(-50%)}
+  .closet .look .add{left:128px;top:208px;width:24px;height:24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.08))}
+  .closet .look .add img{position:absolute;left:50%;top:16.67%;width:16px;height:16px;transform:translateX(-50%)}
+  .closet .look .rm:active,.closet .look .add:active{transform:scale(.88)}
+
+  /* ================= PDP page (scrolls; photo carousel is sticky) ================= */
+  .page{overflow-anchor:none;left:0;top:121px;width:360px;height:679px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;z-index:1;transition:opacity .2s ease;background:#fff}
+  .page::-webkit-scrollbar{display:none}
+  .page.fade{opacity:0}
+  .pgin{position:relative;width:360px}
+  .carousel{position:sticky;top:3px;margin-top:3px;left:auto;width:360px;height:543px;overflow:hidden;z-index:1}
+  .stories{top:356px}
+  .content{position:relative;z-index:2;margin-top:-65px;background:#fff;width:360px}
+  .cin{padding:16px 0 190px}
+  .content .sec{position:relative}
+  .content h3,.content h4{font:600 16px/20px var(--font);color:#0b090a;text-align:center}
+  .content p,.content span,.content b,.content em{white-space:normal}
+  .content b{font-weight:inherit}
+  .content img{display:block}
+
+  /* --- price block --- */
+  .sec.price{display:flex;flex-direction:column;gap:32px;width:360px}
+  .price .txt{padding:0 16px;display:flex;flex-direction:column;gap:6px}
+  .price .prow{display:flex;align-items:center;justify-content:space-between;height:23px}
+  .price .pd{display:flex;align-items:center;gap:6px}
+  .price .pd .p{font:600 16px/23px var(--font);color:#0b090a;white-space:nowrap}
+  .price .pd .o{font:500 14px/18px var(--font);color:#999495;text-decoration:line-through;font-feature-settings:"case" 1,"salt" 1,"lnum" 1,"tnum" 1;white-space:nowrap}
+  .price .pd .d{font:500 14px/18px var(--font);color:#008040;white-space:nowrap}
+  .price .rt{display:flex;align-items:center;gap:2px;height:17px}
+  .price .rt .s{width:10px;height:10px}
+  .price .rt .rd{display:flex;align-items:center;gap:4px}
+  .price .rt .rd b{font:600 12px/17px var(--font);color:#191415}
+  .price .rt .rd u{display:block;width:1px;height:8px;background:#d4d3d3}
+  .price .rt .rd span{font:400 12px/17px var(--font);color:#191415}
+  .price .best{position:relative;align-self:flex-start;display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:4px;margin-top:2px}
+  .price .best .bg{position:absolute;left:0;bottom:0;width:124px;height:32px;max-width:none}
+  .price .best span{position:relative;font:500 12px/17px var(--font);color:#008040;white-space:nowrap}
+  .price .best b{font-weight:600}
+  .price .best .inf{position:relative;width:12px;height:12px}
+  .price .tagrow{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+  .price .tgs{display:flex;gap:8px}
+  .price .tg{background:#ebebeb;padding:4px 6px;font:500 12px/17px var(--font);color:#2b2627;white-space:nowrap}
+  .price .shr{width:20px;height:20px}
+  .price .ttl{font:400 14px/22px var(--font);color:#999495;margin-top:4px}
+
+  .coupons{width:360px;display:flex;flex-direction:column;align-items:center;gap:16px;overflow:hidden}
+  .cscrl{width:360px;height:60px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .cscrl::-webkit-scrollbar{display:none}
+  .crow{display:flex;gap:8px;padding:0 16px;width:max-content}
+  .deal{width:312px;flex:none;display:flex;align-items:center;gap:8px;padding:12px 10px;border:.5px solid #ebebeb;background:linear-gradient(100.88deg,#fbfaf4 40.268%,#fff 100%);height:60px}
+  .deal.d3{padding:12px 8px;background:linear-gradient(101.05deg,#fbfaf4 30%,#fff 100%)}
+  .deal .dl{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+  .deal.d3 .dl{gap:6px}
+  .deal .hx{position:relative;width:32px;height:32px;flex:none}
+  .deal .hx>img:first-child{position:absolute;left:2.18px;top:0;width:27.636px;height:32px}
+  .deal .buy2{position:absolute;left:50%;top:calc(50% + .39px);transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;color:#fff;font-family:Impact,'Haettenschweiler','Arial Narrow',sans-serif;line-height:1;width:11.5px}
+  .deal .buy2 i{font-style:normal}
+  .deal .buy2 i:first-child{font-size:8px}
+  .deal .buy2 i:last-child{font-size:10px}
+  .deal .ofr{position:absolute;left:50%;top:calc(50% + .39px);width:20px;height:20px;transform:translate(-50%,-50%)}
+  .deal .trc{position:absolute;left:calc(50% + .75px);top:calc(50% + .7px);width:18.502px;height:19.394px;transform:translate(-50%,-50%)}
+  .deal .dt{display:flex;flex-direction:column;gap:4px;color:#191415;min-width:0}
+  .deal.d3 .dt{gap:2px}
+  .deal .dt p{font:500 14px/20px var(--font);white-space:nowrap}
+  .deal .dt p b{font-weight:600;color:#008040}
+  .deal .dt span{font:400 11px/16px var(--font);white-space:nowrap}
+  .deal .dt span.sm{font-size:12px;line-height:17px}
+  .deal .dd{display:flex;align-items:center;font:500 12px/17px var(--font);color:#a30013;white-space:nowrap;flex:none}
+  .deal .dd img{width:12px;height:12px;transform:scaleX(-1)}
+
+  .timer{width:360px;background:#f5f5f5;padding:8px;display:flex;align-items:center;justify-content:center;gap:8px}
+  .timer .ti{display:flex;align-items:center;gap:2px}
+  .timer .ti img{width:12px;height:12px}
+  .timer .ti span{font:500 11px/16px var(--font);color:#2b2627;white-space:nowrap}
+  .timer u{display:block;width:1px;height:6px;background:#d4d3d3}
+
+  .sizes{padding:0 16px;display:flex;flex-direction:column;gap:16px;align-items:flex-end}
+  .sizes .sh{width:187px;display:flex;align-items:center;justify-content:space-between}
+  .sizes .st{font:600 16px/20px var(--font);color:#0b090a;white-space:nowrap}
+  .sizes .sg{font:500 11px/15px var(--font);color:#a30013;text-decoration:underline;text-underline-position:from-font;white-space:nowrap;cursor:pointer}
+  .sg-grid{width:100%;display:flex;flex-wrap:wrap;gap:12px 8px;justify-content:center;align-items:flex-start}
+  .so{width:48px;height:38px;border:.5px solid #d4d3d3;background:#fff;font:500 12px/17px var(--font);color:#191415;cursor:pointer;padding:8px;transition:border-color .12s,box-shadow .12s}
+  .so.sel{border-color:#191415;box-shadow:inset 0 0 0 .5px #191415}
+  .so.dis{color:#b9b6b7;font-size:14px;text-decoration:line-through;cursor:not-allowed}
+  .sow{width:48px;display:flex;flex-direction:column;gap:2px;align-items:center}
+  .sow em{font:600 10px/14px var(--font);color:#da1e10;font-style:normal;text-align:center}
+
+  /* --- key highlights / details / trust --- */
+  .sec.kh{margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:32px;width:360px}
+  .sec.kh h3{margin-bottom:-16px}
+  .khbox{width:328px;border:.5px solid #d4d3d3;padding:16px 12px 8px;display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:0}
+  .khbox .di{width:147px;display:flex;flex-direction:column;gap:4px;padding-bottom:12px}
+  .khbox .di.w2{width:143px}
+  .khbox .di.b{border-bottom:.5px solid #d4d3d3}
+  .khbox .di span{font:400 12px/17px var(--font);color:#999495}
+  .khbox .di b{font:500 12px/17px var(--font);color:#191415}
+  .acc{width:328px;border:.5px solid #d4d3d3;padding:16px 12px;display:flex;flex-direction:column;gap:16px;background:#fff}
+  .acc .ar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:.5px solid #d4d3d3;cursor:pointer}
+  .acc .ar.a3{border-bottom:0;padding-bottom:0}
+  .acc .ar.a1{border-bottom-color:#dad9d9}
+  .acc .al{display:flex;align-items:center;gap:12px}
+  .acc .ib{position:relative;width:30px;height:30px;background:#f5f5f5;border:.25px solid #d4d3d3;flex:none}
+  .acc .ib img{position:absolute;left:5px;top:5px;width:20px;height:20px}
+  .acc .at{display:flex;flex-direction:column;gap:4px}
+  .acc .at b{font:500 12px/17px var(--font);color:#191415;white-space:nowrap}
+  .acc .at span{font:400 12px/17px var(--font);color:#999495;white-space:nowrap}
+  .acc .a1 .at span{color:#8f8c8d}
+  .acc .pl{width:16px;height:16px;flex:none}
+  .tm{width:328px;display:flex;align-items:center;justify-content:space-between}
+  .tm .tmi{width:92px;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .tm .tmi>img{width:32px;height:32px}
+  .tm .tmi span{font:400 11px/14px var(--font);color:#191516;text-align:center}
+  .tm .vl{width:1px;height:32px;object-fit:fill}
+  .tm .ship{position:relative;width:32px;height:32px;overflow:hidden}
+  .tm .ship .bx{position:absolute;left:1px;top:8px;width:28px;height:22px;border:1px solid #2b2627;box-sizing:border-box}
+  .tm .ship .q1{position:absolute;left:17px;top:21px;width:9px;height:3px}
+  .tm .ship .q2{position:absolute;right:0;top:1px;width:16.75px;height:16.75px}
+  .tm .ship .q2>img:first-child{position:absolute;inset:0;width:100%;height:100%}
+  .tm .ship .q3{position:absolute;left:5.3px;top:4.2px;width:7px;height:9px}
+  .tm .ship .q4{position:absolute;left:5.5px;top:3.5px;width:6px;height:6px}
+  .tm .ship .q5{position:absolute;left:3px;top:21.5px;width:10px;height:10px}
+
+  /* --- testimonial --- */
+  .testi{position:relative;width:360px;height:319px;margin-top:32px;overflow:hidden;background:#181818}
+  .testi .tbg{position:absolute;inset:0;overflow:hidden}
+  .testi .tbg img{position:absolute;left:-45.62%;top:0;width:230.39%;height:121.47%;max-width:none}
+  .testi .tl{position:absolute;left:188px;top:52.14px;width:72.866px;height:25.506px;object-fit:cover}
+  .testi .tq{position:absolute;left:187.28px;top:96.25px;width:146.5px;font:italic 300 12px/16.8px 'Inter',sans-serif;color:#fff}
+  .testi .tsg{position:absolute;left:187.28px;top:196px;width:74.5px;height:18.75px;transform:rotate(-4.4deg);object-fit:cover}
+  .testi .tstat{position:absolute;left:16px;top:257px;width:328px;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:4px;border-bottom:.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .testi .tstat i{display:block;width:1px;height:24px;background:linear-gradient(180deg,#2b2b2b,rgba(214,83,83,.4),#2b2b2b)}
+  .testi .ts1,.testi .ts2{display:flex;align-items:center;gap:8px}
+  .testi .ts1{width:126px;justify-content:center}
+  .testi .ts2{width:144px;padding-left:5px}
+  .testi .tstat img{width:24px;height:24px}
+  .testi .tstat b{display:block;font:800 16px/1.3 'Pretendard',sans-serif;color:#fce67e;text-shadow:1px 1px 0 rgba(32,32,32,.1);white-space:nowrap}
+  .testi .tstat span{display:block;font:400 10px/14px var(--font);color:#f8f6ed;white-space:nowrap}
+
+  /* --- ratings & reviews --- */
+  .rr{width:360px;margin-top:32px}
+  .rr .rat{padding:12px 16px 0;display:flex;flex-direction:column;align-items:center;gap:16px}
+  .rr .rsum{width:328px;display:flex;gap:40px;align-items:center;padding:0 0 18px 16px;border-bottom:.5px solid #d4d3d3}
+  .rr .rleft{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .rr .big{font:600 32px/40px var(--font);color:#191415}
+  .rr .rc{font:500 12px/17px var(--font);color:#999495;white-space:nowrap}
+  .rr .stars{display:flex;gap:4px}
+  .rr .stars img{width:12px;height:12px}
+  .rr .rbd{flex:1;display:flex;flex-direction:column;gap:8px}
+  .rr .rbi{display:flex;align-items:center;gap:16px}
+  .rr .rbc{display:flex;align-items:center;gap:8px}
+  .rr .rbc b{width:30px;text-align:right;font:500 12px/17px var(--font);color:#191415}
+  .rr .bar{width:120px;height:4px;background:#ebebeb;position:relative}
+  .rr .bar i{position:absolute;left:0;top:0;height:4px}
+  .rr .rbi>span{font:400 10px/14px var(--font);color:#999495;white-space:nowrap}
+  .rr .rev{padding:16px 16px 12px;display:flex;flex-direction:column;gap:16px;align-items:center}
+  .rr .rh{align-self:flex-start;display:flex;gap:8px;align-items:center}
+  .rr .vb{display:flex;align-items:center;gap:5px}
+  .rr .vb img{width:10px;height:10px}
+  .rr .vb span{font:400 11px/16px var(--font);color:#008040;white-space:nowrap}
+  .rr .rt2{width:328px;font:400 12px/17px var(--font);color:#433d3e;margin-top:-4px}
+  .rr .rim{display:flex;gap:8px;width:328px}
+  .rr .r160,.rr .r76{position:relative;overflow:hidden;background:#eee;flex:none}
+  .rr .r160{width:160px;height:160px}
+  .rr .rg4{display:grid;grid-template-columns:76px 76px;gap:8px}
+  .rr .r76{width:76px;height:76px}
+  .rr .r160 img,.rr .r76 img{position:absolute;left:0;width:100%;height:133.33%;max-width:none}
+  .rr .ru{width:329px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e8;padding-top:12px}
+  .rr .rn{display:flex;flex-direction:column;gap:4px}
+  .rr .rn b{font:500 11px/16px var(--font);color:#433d3e}
+  .rr .rn span{font:400 11px/16px var(--font);color:#999495;white-space:nowrap}
+  .rr .ra{display:flex;flex-direction:column;align-items:flex-end}
+  .rr .lk{position:relative;width:24px;height:24px}
+  .rr .lk img{width:24px;height:24px}
+  .rr .lk em{position:absolute;left:-18px;top:7px;font:400 11px/16px var(--font);color:#433d3e;font-style:normal;white-space:nowrap}
+  .rr .ra>span{font:400 11px/16px var(--font);color:#999495;white-space:nowrap}
+  .seeall{width:100%;height:40px;background:#fff;border:.5px solid #d4d3d3;font:600 12px/17px var(--font);letter-spacing:1px;color:#191516;cursor:pointer}
+  .seeall:active{background:#f7f6f6}
+
+  /* --- payment trust --- */
+  .pt{width:360px;height:76px;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:center;background:#fff;margin-top:32px}
+  .pt .ps{display:flex;align-items:center;gap:4px}
+  .pt .ps img{width:9px;height:11px}
+  .pt .ps span{font:500 12px/normal 'TASA Orbiter Text','Pretendard',sans-serif;color:#817431;white-space:nowrap}
+  .pt .pico{display:flex;gap:2px;align-items:center}
+  .pt .pc{display:flex;align-items:center;justify-content:center;height:17.999px;background:#fff;border:.5px solid #d4d3d3;border-radius:2.439px;box-sizing:border-box;flex:none}
+  .pt .pc img{display:block;max-width:none}
+  .pt .lazy{display:block;width:34.326px;height:4.73px;-webkit-mask:url(assets/pdp/pay-lazy-mask.svg) no-repeat;mask:url(assets/pdp/pay-lazy-mask.svg) no-repeat;-webkit-mask-size:34.344px 4.776px;mask-size:34.344px 4.776px}
+  .pt .lazy img{width:100%;height:100%}
+
+  /* --- view similar --- */
+  .sim{width:360px;margin-top:32px;display:flex;flex-direction:column;gap:16px;align-items:center}
+  .slist{width:360px;display:flex;gap:8px;padding:0 16px 8px;overflow-x:auto;scrollbar-width:none}
+  .slist::-webkit-scrollbar{display:none}
+  .scard{position:relative;width:179px;flex:none;display:flex;flex-direction:column;gap:10px;background:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .scard .simg{width:179px;height:268px;position:relative;overflow:hidden;background:#f1f1f1}
+  .scard .simg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .scard .stag{position:absolute;left:0;top:0;padding:4px 6px;background:linear-gradient(106.66deg,#d2a630 3.59%,#f4d583 98.5%);font:600 9px/12px var(--font);color:#fff;white-space:nowrap;z-index:2}
+  .scard .sbag{position:absolute;left:147px;top:232px;width:24px;height:24px;border-radius:16px;background:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.08));border:0;padding:0;cursor:pointer;z-index:2}
+  .scard .sbag img{position:absolute;left:50%;top:16.67%;width:16px;height:16px;transform:translateX(-50%)}
+  .scard .sdots{position:absolute;left:79px;top:254px;width:22px;height:4px;z-index:2}
+  .scard .stx{padding:0 4px;display:flex;flex-direction:column;gap:8px}
+  .scard .stg{display:flex;gap:6px}
+  .scard .stg span{background:#ebebeb;padding:4px 6px;font:400 11px/16px var(--font);color:#191415;white-space:nowrap}
+  .scard .spr{display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .scard .spr b{font:600 12px/17px var(--font);color:#0b090a}
+  .scard .spr s{font:600 12px/17px var(--font);color:#999495;text-decoration:line-through}
+  .scard .spr em{font:600 12px/17px var(--font);color:#008040;font-style:normal}
+  .scard .sbo{align-self:flex-start;display:flex;align-items:center;gap:2px;padding:2px 4px;border:.3px solid #00a251;border-radius:2px;background:linear-gradient(90deg,#eaf6ef,rgba(255,255,255,0));color:#008040;margin-top:-4px}
+  .scard .sbo i{font:500 11px/16px var(--font);font-style:normal}
+  .scard .sbo b{font:600 12px/17px var(--font)}
+  .scard .stt{width:163px;font:400 11px/16px var(--font);color:#999495;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-4px}
+  .scard .srt{display:flex;align-items:center;justify-content:space-between}
+  .scard .srt .rtg{display:flex;align-items:center;gap:3px}
+  .scard .srt .rtg img{width:8px;height:8px}
+  .scard .srt .rtg b{font:500 11px/16px var(--font);color:#191415}
+  .scard .srt .rtg u{display:block;width:1px;height:7px;background:#d4d3d3}
+  .scard .srt .rtg span{font:400 11px/16px var(--font);color:#191415}
+  .scard .srt .rtg div{display:flex;align-items:center;gap:4px}
+  .scard .clr{display:flex;align-items:center;gap:3px}
+  .scard .clr i{display:block;width:10px;height:10px}
+  .scard .clr span{font:400 10px/14px var(--font);color:#191415}
+  .scard:active .simg{opacity:.92}
+
+  .appbar .menu{width:24px;height:24px;border:0;background:none;padding:0;cursor:pointer;flex:none}
+  .appbar .menu img{width:24px;height:24px}
+
+  /* ---------- quick try-on (photo already uploaded): original fades into a capsule ---------- */
+  .hero-new{opacity:0;filter:blur(14px);transition:opacity 1.5s cubic-bezier(.4,0,.2,1),filter 1.5s cubic-bezier(.4,0,.2,1)}
+  .qt .hero-new{opacity:1;filter:blur(0)}
+  .hwrap{position:absolute;left:0;top:0;width:360px;height:581px;overflow:hidden;border-radius:0;opacity:1;will-change:left,top,width,height,opacity}
+  .hwrap img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .htint{position:absolute;inset:0;background:rgba(255,255,255,.2);opacity:0;transition:opacity .8s ease}
+  .qt .htint{opacity:1}
+  .nofx,.nofx *{transition:none!important}
+
+  /* ---------- "Item Added" chip (quick try-on) ---------- */
+  .tryon .lbl .txt.c{opacity:0}
+  .tryon .thumb{position:relative;width:0;height:16px;margin-left:-4px;border-radius:23.758px;overflow:hidden;background:#fff;flex:none;opacity:0;transition:width .4s ease,margin .4s ease,opacity .4s ease}
+  .tryon .thumb img{position:absolute;left:-3.48%;top:-2.94%;width:103.48%;height:137.98%;max-width:none}
+  .added .tryon{width:187px;left:157px;top:410px}
+  .added .tryon .ic{display:none}
+  .added .tryon .lbl{width:147px}
+  .added .tryon .lbl .txt.a,.added .tryon .lbl .txt.b{opacity:0}
+  .added .tryon .lbl .txt.c{opacity:1}
+  .added:not(.qt) .tryon .thumb,.qt3 .tryon .thumb{width:16px;margin-left:0;opacity:1}
+  .qt.qt2 .tryon .thumb{width:16px;margin-left:0}
+  /* capsule -> small circle inside the chip */
+  .qt.qt2 .htint{opacity:0;transition:opacity .6s ease}
+
+  /* ---------- pill closes to an icon-only chip = loading state ---------- */
+  .loadchip .tryon{width:36px;left:308px;top:406px;gap:0;cursor:default;pointer-events:none}
+  .loadchip .tryon .ic{display:block}
+  .loadchip .tryon .lbl{width:0}
+  .loadchip .tryon .lbl .txt.a,.loadchip .tryon .lbl .txt.b,.loadchip .tryon .lbl .txt.c{opacity:0}
+  .loadchip.added:not(.qt) .tryon .thumb,.loadchip .tryon .thumb{width:0;margin-left:0;opacity:0}
+
+  /* ---------- loading finished: chip flips to a tick, image refines into the final avatar look ---------- */
+  .tryon .tick{display:none;width:20px;height:20px;flex:none}
+  .loadchip.ticked .tryon{width:40px;left:308px;top:410px;pointer-events:auto;cursor:pointer}
+  .ticked .tryon .ic{display:none}
+  .ticked .tryon .tick{display:block}
+  .refine .hero-new{opacity:1;filter:blur(0);z-index:2}
+  .tryon{transform-style:preserve-3d}
+
+  /* ---------- tick chip opens into the "Regenrate" pill; tag returns to the product's own tag ---------- */
+  .regen.result .tryon{top:410px}
+  .tag.swap,.tag.hide{opacity:0!important}
+
+  .toast{position:absolute;left:50%;bottom:150px;transform:translateX(-50%) translateY(20px);background:#222;color:#fff;font:500 13px/1 var(--font);padding:9px 14px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;z-index:50;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+<div class="device" id="device">
+
+  <!-- ========== Screen 1 : PDP ========== -->
+
+  <!-- Browser header -->
+  <div class="abs browser">
+    <div class="abs time">9:30</div>
+    <img class="abs sb-wifi" src="assets/wifi.svg" alt="">
+    <img class="abs sb-signal" src="assets/signal.svg" alt="">
+    <img class="abs sb-batt" src="assets/battery.svg" alt="">
+    <div class="abs pill"><img src="assets/lock.svg" alt=""><span>tigc.in</span></div>
+  </div>
+
+  <!-- App bar -->
+  <div class="abs appbar">
+    <div class="l"><button class="menu" id="menuBtn" aria-label="Menu"><img id="menuIcon" src="assets/burger.svg" alt=""></button><img src="assets/logo.svg" width="57.647" height="20" alt="TIGC"></div>
+    <div class="r"><img src="assets/search.svg" width="20" height="20" alt=""><img src="assets/bag.svg" width="20" height="20" alt=""></div>
+  </div>
+
+  <!-- Image carousel -->
+  <div class="abs page" id="page"><div class="pgin">
+  <div class="carousel">
+    <div class="scroller" id="scroller">
+      <div class="strip">
+        <div class="slide gen" style="height:500px" data-v="2">
+          <div class="roam"><img src="assets/roaming.svg" alt=""></div>
+          <div class="v2 vx">
+            <div class="orb">
+              <i class="pulse"></i><i class="pulse"></i><i class="pulse"></i>
+              <div class="orbit"><i></i><i></i></div><div class="orbit o2"><i></i><i></i></div>
+              <div class="spin"></div>
+              <div class="disc"><span class="ic2" data-icon></span></div>
+            </div>
+            <i class="sp" style="left:76px;top:168px;animation-delay:.2s"></i>
+            <i class="sp" style="left:268px;top:196px;animation-delay:.9s;width:8px;height:8px"></i>
+            <i class="sp" style="left:96px;top:292px;animation-delay:1.4s;width:7px;height:7px"></i>
+            <i class="sp" style="left:250px;top:150px;animation-delay:1.8s;width:12px;height:12px"></i>
+            <div class="pct"></div>
+          </div>
+          <div class="ct">
+          <span class="ic">
+            <img src="assets/ti0.svg" style="left:20.35%;top:24.83%;width:61.6%;height:51.26%" alt="">
+            <img src="assets/ti1.svg" style="left:9.1%;top:9.09%;width:25.19%;height:22.44%" alt="">
+            <img src="assets/ti2.svg" style="left:70.34%;top:66.91%;width:22.73%;height:22.92%" alt="">
+            <img src="assets/ti3.svg" style="left:9.09%;top:66.93%;width:22.17%;height:22.97%" alt="">
+            <img src="assets/ti4.svg" style="left:16.62%;top:85.55%;width:2.81%;height:1.1%" alt="">
+            <img src="assets/ti5.svg" style="left:14.74%;top:83.89%;width:1.1%;height:1.19%" alt="">
+            <img src="assets/ti6.svg" style="left:70.34%;top:9.09%;width:22.72%;height:22.43%" alt="">
+            <img src="assets/ti7.svg" style="left:87.95%;top:15.23%;width:2.41%;height:15.69%" alt="">
+            <i class="scan"></i>
+          </span>
+            <p>creating the look</p><p>styling the details</p><p>almost ready</p>
+          </div>
+          <div class="gt">Your image is getting ready</div>
+        </div>
+        <div class="slide" style="height:581px"><img class="bg hero-new" id="heroNew" alt=""><div class="hwrap" id="hwrap"><img class="bg hero-img" id="heroImg" src="assets/hero-overlay.png" alt=""><i class="htint"></i></div></div>
+        <div class="slide" style="height:580px">
+          <img class="bg" src="assets/red-g2.png" alt="">
+          <div class="hl"><div class="col">
+            <h3>KEY HIGHLIGHTS</h3>
+            <div class="row"><div class="t"><div class="k">Fit</div><div class="v">REGULAR FIT</div></div><img class="ln" src="assets/line23.svg" alt=""></div>
+            <div class="row"><div class="t"><div class="k">Waist Rise</div><div class="v">MID RISE</div></div><img class="ln" src="assets/line23.svg" alt=""></div>
+            <div class="row"><div class="t"><div class="k">Stretch</div><div class="v">NON STRETCHABLE</div></div><img class="ln" src="assets/line23.svg" alt=""></div>
+          </div></div>
+        </div>
+        <div class="slide" style="height:580px"><img class="bg" src="assets/red-g3.png" alt=""></div>
+        <div class="slide" style="height:580px"><img class="bg" src="assets/red-g4.png" alt=""></div>
+        <div class="slide" style="height:580px"><img class="bg" src="assets/red-g5.png" alt=""></div>
+        <div class="edge" id="edge"></div>
+      </div>
+    </div>
+
+    <div class="abs ind"><i id="indThumb"></i></div>
+    <div class="abs tag">On You</div>
+    <button class="abs tryon" id="tryonBtn" aria-label="Try on">
+          <span class="ic">
+            <img src="assets/ti0.svg" style="left:20.35%;top:24.83%;width:61.6%;height:51.25%" alt="">
+            <img src="assets/ti1.svg" style="left:9.1%;top:9.1%;width:25.19%;height:22.43%" alt="">
+            <img src="assets/ti2.svg" style="left:70.34%;top:66.91%;width:22.74%;height:22.91%" alt="">
+            <img src="assets/ti3.svg" style="left:9.09%;top:66.93%;width:22.17%;height:22.97%" alt="">
+            <img src="assets/ti4.svg" style="left:16.62%;top:85.55%;width:2.81%;height:1.1%" alt="">
+            <img src="assets/ti5.svg" style="left:14.74%;top:83.89%;width:1.1%;height:1.19%" alt="">
+            <img src="assets/ti6.svg" style="left:70.34%;top:9.09%;width:22.72%;height:22.43%" alt="">
+            <img src="assets/ti7.svg" style="left:87.95%;top:15.24%;width:2.41%;height:15.68%" alt="">
+            <i class="scan"></i>
+          </span>
+          <span class="lbl"><span class="txt a">Try on</span><span class="txt b">Regenrate</span><span class="txt c">Item Added (3 credits left)</span></span><span class="thumb"><img id="thumbImg" alt=""></span><img class="tick" src="assets/pdp/check-circle.svg" alt="">
+        </button>
+    <div class="abs trust">
+      <div class="av"><img src="assets/e86.png" alt=""><img src="assets/e87.png" alt=""><img src="assets/e88.png" alt=""></div>
+      <span>Trusted by <b>40 Lakh+</b> Customers</span>
+    </div>
+  <div class="abs stories" id="stories" role="button" aria-label="Style Stories">
+    <div class="pic"><div class="ph">
+      <img src="assets/st1.png" style="left:1.05%;top:-2%;width:100%;height:133.93%" alt="">
+      <img src="assets/st2.png" style="left:0;top:-.3%;width:100%;height:133.93%" alt="">
+      <img src="assets/st3.png" style="left:0;top:0;width:100%;height:100%;object-fit:cover" alt="">
+      <img src="assets/st4.png" style="left:0;top:0;width:100%;height:100%;object-fit:cover" alt="">
+      <img src="assets/st5.png" style="left:-5.06%;top:-.03%;width:104.99%;height:140.61%" alt="">
+    </div></div>
+    <i class="rg"></i>
+    <span class="lb">Style Stories</span>
+  </div>
+  </div>
+
+  <!-- ===== PDP content (scrolls over the sticky photo carousel) ===== -->
+  <div class="content" id="content"><div class="cin">
+
+    <!-- price / offers / sizes -->
+    <section class="sec price">
+      <div class="txt">
+        <div class="prow">
+          <div class="pd"><span class="p" id="pPrice">₹999</span><span class="o" id="pMrp">₹2,549</span><span class="d" id="pOff">61% OFF</span></div>
+          <div class="rt"><img class="s" src="assets/pdp/star10.svg" alt=""><div class="rd"><b>4.5</b><u></u><span>300</span></div></div>
+        </div>
+        <div class="best"><img class="bg" src="assets/pdp/bestoffer-bg.svg" alt=""><span>Best Offer <b id="pBest">₹899 </b></span><img class="inf" src="assets/pdp/info.svg" alt=""></div>
+        <div class="tagrow"><div class="tgs"><span class="tg" id="pFit">Relaxed Fit</span><span class="tg" id="pFab">Cotton</span></div><img class="shr" src="assets/pdp/share.svg" alt=""></div>
+        <p class="ttl" id="pTitle">Men's Yellow Relaxed Fit Graphic Printed 240 GSM Street Wear T-Shirt</p>
+      </div>
+
+      <div class="coupons">
+        <h4>COUPONS</h4>
+        <div class="cscrl"><div class="crow">
+          <div class="deal"><div class="dl"><div class="hx"><img src="assets/pdp/hex1.svg" alt=""><div class="buy2"><i>BUY</i><i>2</i></div></div><div class="dt"><p>Get this for <b>₹899</b></p><span>using Buy 2 Power Polos @1799</span></div></div><div class="dd">Details<img src="assets/pdp/arrow-l.svg" alt=""></div></div>
+          <div class="deal"><div class="dl"><div class="hx"><img src="assets/pdp/hex2.svg" alt=""><img class="ofr" src="assets/pdp/offer.svg" alt=""></div><div class="dt"><p>Get this for <b>₹820</b></p><span>using 10% OFF on orders above ₹1499</span></div></div><div class="dd">Details<img src="assets/pdp/arrow-l.svg" alt=""></div></div>
+          <div class="deal d3"><div class="dl"><div class="hx"><img src="assets/pdp/hex2.svg" alt=""><img class="trc" src="assets/pdp/traced.svg" alt=""></div><div class="dt"><p>Get this for <b>₹820</b></p><span class="sm">using 10% OFF on your first order</span></div></div><div class="dd">Details<img src="assets/pdp/arrow-l.svg" alt=""></div></div>
+        </div></div>
+      </div>
+
+      <div class="timer"><div class="ti"><img src="assets/pdp/t1.svg" alt=""><span>Sale 2h: 37m: 30s</span></div><u></u><div class="ti"><img src="assets/pdp/t2.svg" alt=""><span>Ships in 24 hours</span></div><u></u><div class="ti"><img src="assets/pdp/t3.svg" alt=""><span>Free Shipping</span></div></div>
+
+      <div class="sizes">
+        <div class="sh"><span class="st">SIZES</span><span class="sg">SIZE GUIDE</span></div>
+        <div class="sg-grid" id="sizeGrid">
+          <button class="so">28</button><button class="so">30</button><button class="so">32</button>
+          <div class="sow"><button class="so">34</button><em>2 left</em></div>
+          <button class="so">36</button><button class="so dis">38</button><button class="so">40</button><button class="so">42</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- key highlights / details / trust -->
+    <section class="sec kh">
+      <h3>KEY HIGHLIGHTS</h3>
+      <div class="khbox">
+        <div class="di b"><span>Fabric</span><b>100% RICH COTTON</b></div><div class="di b w2"><span>Color</span><b>POWDER BLUE</b></div>
+        <div class="di b"><span>Fit</span><b>LOOSE FIT</b></div><div class="di b w2"><span>Length</span><b>HALF LENGTH</b></div>
+        <div class="di"><span>Waist Rise</span><b>MID RISE</b></div><div class="di w2"><span>Waistband</span><b>WITH BELT LOOPS</b></div>
+      </div>
+      <div class="acc">
+        <div class="ar a1"><div class="al"><span class="ib"><img src="assets/pdp/i-details.svg" alt=""></span><div class="at"><b>PRODUCT DESCRIPTION</b><span>Manufacture, Care and Fit</span></div></div><img class="pl" src="assets/pdp/plus1.svg" alt=""></div>
+        <div class="ar a2"><div class="al"><span class="ib"><img src="assets/pdp/i-truck.svg" alt=""></span><div class="at"><b>SHIPPING &amp; DELIVERY POLICY</b><span>Know about Delivery policy</span></div></div><img class="pl" src="assets/pdp/plus2.svg" alt=""></div>
+        <div class="ar a3"><div class="al"><span class="ib"><img src="assets/pdp/i-return.svg" alt=""></span><div class="at"><b>15 DAYS RTURN &amp; EXCHANGE POLICY</b><span>Know about Return &amp; Exchnage</span></div></div><img class="pl" src="assets/pdp/plus2.svg" alt=""></div>
+      </div>
+      <div class="tm">
+        <div class="tmi"><img src="assets/pdp/m-secure.svg" alt=""><span>Safe &amp; Secure Payment</span></div><img class="vl" src="assets/pdp/line20.svg" alt="">
+        <div class="tmi"><img src="assets/pdp/m-returns.svg" alt=""><span>Hassle Free Returns</span></div><img class="vl" src="assets/pdp/line20.svg" alt="">
+        <div class="tmi"><div class="ship"><i class="bx"></i><img class="q1" src="assets/pdp/q1.svg" alt=""><div class="q2"><img src="assets/pdp/q2.svg" alt=""><img class="q3" src="assets/pdp/q3.svg" alt=""><img class="q4" src="assets/pdp/q4.svg" alt=""></div><img class="q5" src="assets/pdp/q5.svg" alt=""></div><span>100% Genuine Quality</span></div>
+      </div>
+    </section>
+
+    <!-- testimonial -->
+    <section class="testi">
+      <div class="tbg"><img src="assets/pdp/testi.png" alt=""></div>
+      <img class="tl" src="assets/pdp/tigc-logo.png" alt="TIGC"><p class="tq">“TIGC blends style and comfort effortlessly, making it my go-to fashion brand both on and off the field”</p><img class="tsg" src="assets/pdp/sign.png" alt="">
+      <div class="tstat">
+        <div class="ts1"><img src="assets/pdp/badge1.svg" alt=""><div><b>60 LAKHS+ </b><span>Satisfied Customers</span></div></div>
+        <i></i>
+        <div class="ts2"><img src="assets/pdp/badge2.svg" alt=""><div><b>2 CRORES+ </b><span>Products Sold</span></div></div>
+      </div>
+    </section>
+
+    <!-- ratings & reviews -->
+    <section class="rr">
+      <div class="rat">
+        <h3>RATINGS &amp; REVIEWS</h3>
+        <div class="rsum"><div class="rleft"><b class="big">4.2</b><span class="rc">3 ratings</span><div class="stars"><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-e.svg" alt=""></div></div>
+          <div class="rbd">
+            <div class="rbi"><div class="rbc"><b>5</b><div class="bar"><i style="width:51px;background:#00a251"></i></div></div><span>(12)</span></div>
+            <div class="rbi"><div class="rbc"><b>4</b><div class="bar"><i style="width:111px;background:#00a251"></i></div></div><span>(21)</span></div>
+            <div class="rbi"><div class="rbc"><b>3</b><div class="bar"><i style="width:83px;background:#f79009"></i></div></div><span>(12)</span></div>
+            <div class="rbi"><div class="rbc"><b>2</b><div class="bar"><i style="width:24px;background:#f79009"></i></div></div><span>(3)</span></div>
+            <div class="rbi"><div class="rbc"><b>1</b><div class="bar"><i style="width:18px;background:#f04438"></i></div></div><span>(1)</span></div>
+          </div></div>
+      </div>
+      <div class="rev">
+        <div class="rh"><div class="stars"><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-f.svg" alt=""><img src="assets/pdp/star-e.svg" alt=""></div><div class="vb"><img src="assets/pdp/verified.svg" alt=""><span>Verified buyer</span></div></div>
+        <p class="rt2">That word last bencher is boom dude your product quality is very good !</p>
+        <div class="rim"><div class="r160"><img src="assets/pdp/r1.png" style="top:-2.21%" alt=""></div><div class="rg4"><div class="r76"><img src="assets/pdp/r2.png" style="top:-.88%" alt=""></div><div class="r76"><img src="assets/pdp/r3.png" style="top:-.88%" alt=""></div><div class="r76"><img src="assets/pdp/r4.png" style="top:-2.19%" alt=""></div><div class="r76"><img src="assets/pdp/r5.png" style="top:-.88%" alt=""></div></div></div>
+        <div class="ru"><div class="rn"><b>Ram</b><span>2 days ago </span></div><div class="ra"><div class="lk"><em>(15)</em><img src="assets/pdp/like.svg" alt=""></div><span>People found this helpful</span></div></div>
+        <button class="seeall">SEE ALL REVIEWS</button>
+      </div>
+    </section>
+
+    <!-- payment trust -->
+    <section class="pt">
+      <div class="ps"><img src="assets/pdp/pay-shield.svg" alt=""><span>100% SECURE TRANSACTION</span></div>
+      <div class="pico">
+        <i class="pc" style="padding:4.268px 3.49px"><img src="assets/pdp/pay-gpay.svg" style="width:23.624px;height:9.624px" alt=""></i>
+        <i class="pc" style="padding:4.264px 3.49px"><img src="assets/pdp/pay-paytm.svg" style="width:24.011px;height:7.526px" alt=""></i>
+        <i class="pc" style="padding:2.25px 8.466px"><img src="assets/pdp/pay-phonepe.svg" style="width:11.249px;height:11.249px" alt=""></i>
+        <i class="pc" style="padding:5.487px 3.49px"><img src="assets/pdp/pay-visa.png" style="width:23.778px;height:7.926px;object-fit:contain" alt=""></i>
+        <i class="pc" style="padding:5.75px 3.49px"><img src="assets/pdp/pay-rupay.svg" style="width:32.398px;height:8.999px" alt=""></i>
+        <i class="pc" style="padding:2.25px 8.466px;width:41.128px"><span class="lazy"><img src="assets/pdp/pay-lazy.svg" alt=""></span></i>
+        <i class="pc" style="padding:4.877px 3.49px"><img src="assets/pdp/pay-mc.svg" style="width:16.972px;height:10.489px" alt=""></i>
+        <i class="pc" style="padding:4.268px 5.644px"><img src="assets/pdp/pay-amz.svg" style="width:18.952px;height:12.003px" alt=""></i>
+        <i class="pc" style="padding:4.268px 5.644px;background:#26a6d1;border:0"><img src="assets/pdp/pay-amex.svg" style="width:14.086px;height:10.124px" alt=""></i>
+      </div>
+    </section>
+
+    <!-- view similar -->
+    <section class="sim">
+      <h3>VIEW SIMILAR</h3>
+      <div class="slist" id="simList"></div>
+    </section>
+
+  </div></div>
+
+  </div></div>
+
+  <!-- CTA bar -->
+  <div class="abs ctabar">
+    <div class="top">
+      <div class="offers">
+        <div class="benefit a"><i></i></div>
+        <div class="benefit b"><i></i></div>
+        <div class="ell"><div><img src="assets/ellipse77.svg" alt=""></div></div>
+        <div class="offer">
+          <div class="coin"><img src="assets/coin.png" alt=""></div>
+          <p>Earn upto 28 Garage coins post-delivery!</p>
+          <a>Know How</a>
+        </div>
+      </div>
+      <div class="cta"><button class="btn" id="addBtn"><span class="rip" id="rip"></span><span class="l">add to cart</span></button></div>
+    </div>
+    <div class="chrome"><div class="m">
+      <img style="left:0;top:4px" src="assets/back.svg" width="24" height="24" alt="">
+      <img style="left:76px;top:4px" src="assets/fwd.svg" width="24" height="24" alt="">
+      <img style="left:152px;top:0" src="assets/newtab.svg" width="32" height="32" alt="">
+      <div class="tabs" style="left:235px;top:4px"><div>4</div></div>
+      <img style="left:311px;top:4px" src="assets/more.svg" width="24" height="24" alt="">
+    </div></div>
+  </div>
+
+  <!-- ========== Screen 2 : Virtual try on bottom sheet ========== -->
+  <div class="abs scrim" id="scrim"></div>
+  <div class="abs sheet2" id="sheet2" role="dialog" aria-label="Virtual try on">
+    <div class="glow" style="left:calc(50% - 96px);top:calc(50% - 91px)"><img src="assets/glow.svg" alt=""></div>
+    <div class="glow" style="left:calc(50% + 80px);top:calc(50% - 99px)"><img src="assets/glow.svg" alt=""></div>
+    <button class="x" id="closeSheet" aria-label="Close"><svg viewBox="0 0 12 12" fill="none" stroke="#0b090a" stroke-width="1.4" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
+
+    <div class="head">
+      <div class="ttl">
+        <span class="ic">
+          <img src="assets/ti0.svg" style="left:20.35%;top:24.83%;width:61.6%;height:51.26%" alt="">
+          <img src="assets/ti1.svg" style="left:9.1%;top:9.09%;width:25.19%;height:22.44%" alt="">
+          <img src="assets/ti2.svg" style="left:70.34%;top:66.91%;width:22.73%;height:22.92%" alt="">
+          <img src="assets/ti3.svg" style="left:9.09%;top:66.93%;width:22.17%;height:22.97%" alt="">
+          <img src="assets/ti4.svg" style="left:16.62%;top:85.55%;width:2.81%;height:1.1%" alt="">
+          <img src="assets/ti5.svg" style="left:14.74%;top:83.89%;width:1.1%;height:1.19%" alt="">
+          <img src="assets/ti6.svg" style="left:70.34%;top:9.09%;width:22.72%;height:22.43%" alt="">
+          <img src="assets/ti7.svg" style="left:87.95%;top:15.23%;width:2.41%;height:15.69%" alt="">
+          <i class="scan"></i>
+        </span>
+        <span class="t">virtual try on</span>
+      </div>
+      <p class="sub">Add your photo and see how this looks on you with a photo of yourself.</p>
+    </div>
+
+    <div class="cards">
+      <div class="w r"><div class="card"><img class="im" src="assets/card-right.png" alt=""></div></div>
+      <div class="w l"><div class="card"><img class="im" src="assets/card-left.png" alt=""></div></div>
+      <div class="c"><div class="card"><img class="im" src="assets/card-center.png" alt=""></div></div>
+    </div>
+
+    <div class="cta2"><button class="btn" id="continueBtn"><span class="rip" id="rip2"></span><span class="l" style="left:calc(50% - 39px)">continue</span></button></div>
+  </div>
+
+  <!-- ========== Screen 3 : Choose a photo ========== -->
+  <div class="abs sheet2 s3" id="sheet3" role="dialog" aria-label="Choose a photo">
+    <div class="glow" style="left:calc(50% - 96px);top:calc(50% - 107px)"><img src="assets/n3-glow.svg" alt=""></div>
+    <div class="glow" style="left:calc(50% + 80px);top:calc(50% - 107px)"><img src="assets/n3-glow.svg" alt=""></div>
+    <div class="col">
+      <div class="ttl2">
+        <span class="ic" style="position:relative;width:24px;height:24px;overflow:hidden;flex:none;display:block">
+          <img src="assets/ti0.svg" style="position:absolute;max-width:none;left:20.35%;top:24.83%;width:61.6%;height:51.26%" alt="">
+          <img src="assets/ti1.svg" style="position:absolute;max-width:none;left:9.1%;top:9.09%;width:25.19%;height:22.44%" alt="">
+          <img src="assets/ti2.svg" style="position:absolute;max-width:none;left:70.34%;top:66.91%;width:22.73%;height:22.92%" alt="">
+          <img src="assets/ti3.svg" style="position:absolute;max-width:none;left:9.09%;top:66.93%;width:22.17%;height:22.97%" alt="">
+          <img src="assets/ti4.svg" style="position:absolute;max-width:none;left:16.62%;top:85.55%;width:2.81%;height:1.1%" alt="">
+          <img src="assets/ti5.svg" style="position:absolute;max-width:none;left:14.74%;top:83.89%;width:1.1%;height:1.19%" alt="">
+          <img src="assets/ti6.svg" style="position:absolute;max-width:none;left:70.34%;top:9.09%;width:22.72%;height:22.43%" alt="">
+          <img src="assets/ti7.svg" style="position:absolute;max-width:none;left:87.95%;top:15.23%;width:2.41%;height:15.69%" alt="">
+          <i class="scan" style="position:absolute;left:-6.545px;top:2.18px;width:6.545px;height:19.636px;background-image:linear-gradient(90deg,rgba(129,25,120,0) 0%,rgba(129,25,120,.15) 20%,rgba(159,39,127,.85) 50%,rgba(129,25,120,.15) 80%,rgba(62,40,171,0) 100%);animation:scan2 2s ease-in-out infinite"></i>
+        </span>
+        <span class="t">virtual try on</span>
+      </div>
+      <div class="cards3">
+        <div class="w r"><div class="card"><img src="assets/n3-right.png" alt=""></div></div>
+        <div class="w l"><div class="card"><img src="assets/n3-left.png" alt=""></div></div>
+        <div class="c"><div class="card"><img src="assets/n3-center.png" alt=""></div></div>
+      </div>
+      <div class="info">
+        <div class="h"><b>See it on you</b><span>Add a photo of yourself to see how this looks on you.</span></div>
+        <div class="opts">
+          <button class="opt" id="optCamera"><div class="l"><img src="assets/n3-cam.svg" alt=""><div class="tx"><b>Take a photo</b><span>Guided capture — we check framing first</span></div></div><img class="go" src="assets/arrow-r.svg" alt=""></button>
+          <button class="opt" id="optGallery"><div class="l"><img src="assets/n3-gal.svg" alt=""><div class="tx"><b>Upload from gallery</b><span>Choose a photo from your device</span></div></div><img class="go" src="assets/arrow-r.svg" alt=""></button>
+        </div>
+        <div class="disc"><p>Generative AI can make mistakes</p><p>Fit and apperances may not be exact</p></div>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="galleryInput" accept="image/*" hidden>
+  <input type="file" id="cameraInput" accept="image/*" capture="user" hidden>
+
+  <!-- camera view -->
+  <div class="cam" id="cam">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <div class="msg" id="camMsg" hidden></div>
+    <button class="cx" id="camClose" aria-label="Close camera"><svg viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
+    <div class="bar"><button class="shutter" id="shutter" aria-label="Capture"></button></div>
+  </div>
+  <canvas id="camCanvas" hidden></canvas>
+
+  <!-- ========== Screen 6 : Regenerate / Image generated ========== -->
+  <div class="abs sheet2 s6" id="sheet6" role="dialog" aria-label="Image generated">
+    <img class="glow7" src="assets/s7-glow.svg" alt="">
+    <button class="x" id="close6" aria-label="Close"><svg viewBox="0 0 12 12" fill="none" stroke="#0b090a" stroke-width="1.4" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11"/></svg></button>
+    <div class="gtitle">Image generated</div>
+    <div class="quota"><p>4 OF 5 credits left today</p></div>
+    <div class="res">
+      <img class="a" src="assets/s7-img2.png" alt=""><img class="b" src="assets/s7-img3.png" alt="">
+      <button class="dl" id="dl6" aria-label="Download"><img src="assets/s7-dl.svg" alt=""></button>
+    </div>
+    <div class="below">
+      <div class="cap">Did you like this? if not you can replace the image</div>
+      <div class="opts">
+        <button class="opt" id="optCamera6"><div class="l"><img src="assets/s7-cam.svg" alt=""><div class="tx"><b>Take a photo</b><span>Guided capture  we check framing first</span></div></div><img class="go" src="assets/s7-arrow.svg" alt=""></button>
+        <button class="opt" id="optGallery6"><div class="l"><img src="assets/s7-gal.svg" alt=""><div class="tx"><b>Upload from gallery</b><span>Choose a photo from your device</span></div></div><img class="go" src="assets/s7-arrow.svg" alt=""></button>
+        <div class="or">or</div>
+        <button class="opt" id="closet6"><div class="l">
+          <div class="mini">
+            <div class="w r"><div class="card"><img src="assets/s7-m-right.png" alt=""></div></div>
+            <div class="w l"><div class="card"><img src="assets/s7-m-left.png" alt=""></div></div>
+            <div class="c"><div class="card"><img src="assets/s7-m-center.png" alt=""></div></div>
+          </div>
+          <div class="tx"><b>Visit your virtual Closet</b><span>Explore your saved outfits</span></div></div><img class="go" src="assets/s7-arrow.svg" alt=""></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Virtual Closet page ========== -->
+  <div class="abs closet" id="closet">
+    <div class="cscroll" id="cscroll">
+      <div class="cpage">
+        <div class="cglow"><img src="assets/c-glow.svg" alt=""></div>
+        <div class="avt">
+          <h2>My Avatar</h2>
+          <div class="pic"><div class="im"><img src="assets/c-avatar.png" alt=""></div><button class="edit" id="editAvatar" aria-label="Edit avatar"><img src="assets/c-edit.svg" alt=""></button></div>
+        </div>
+        <div class="quota"><p>4 OF 5 credits left today</p></div>
+        <div class="ylt">Your Looks</div>
+        <div class="grid" id="looks">
+          <div class="look"><img class="ph" src="assets/c-look1.png" alt=""><button class="rm" aria-label="Remove"><img src="assets/c-x.svg" alt=""></button><button class="add" aria-label="Add to bag"><img src="assets/c-bag.svg" alt=""></button></div>
+          <div class="look"><img class="ph" src="assets/c-look2.png" alt=""><button class="rm" aria-label="Remove"><img src="assets/c-x.svg" alt=""></button><button class="add" aria-label="Add to bag"><img src="assets/c-bag.svg" alt=""></button></div>
+          <div class="look"><img class="ph" src="assets/c-look2.png" alt=""><button class="rm" aria-label="Remove"><img src="assets/c-x.svg" alt=""></button><button class="add" aria-label="Add to bag"><img src="assets/c-bag.svg" alt=""></button></div>
+          <div class="look"><img class="ph" src="assets/c-look4.png" alt=""><button class="rm" aria-label="Remove"><img src="assets/c-x.svg" alt=""></button><button class="add" aria-label="Add to bag"><img src="assets/c-bag.svg" alt=""></button></div>
+        </div>
+      </div>
+    </div>
+    <div class="ctop" id="ctop">
+      <div class="plp"><div class="l"><button class="back" id="closetBack" aria-label="Back"><img src="assets/c-back.svg" alt=""></button><span class="t">Virtual Closet</span></div><img class="bag" src="assets/c-hbag.svg" alt=""></div>
+    </div>
+    <div class="bot" id="cbot"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+</div>
+
+<script>
+  // scale the phone to fit short viewports
+  const stage=document.getElementById('stage');
+  function fit(){const s=Math.min(1,(innerHeight-24)/800,(innerWidth-24)/360);stage.style.transform=`scale(${s})`;stage.style.margin=`${-(800*(1-s))/2}px ${-(360*(1-s))/2}px`}
+  addEventListener('resize',fit);fit();
+
+  const page=document.getElementById('page');
+  function lock(b){sc.style.overflowY=b?'hidden':'auto';page.style.overflowY=b?'hidden':'auto'}
+  const toast=document.getElementById('toast');
+  function say(t){toast.textContent=t;toast.classList.add('show');clearTimeout(say.t);say.t=setTimeout(()=>toast.classList.remove('show'),1600)}
+
+  // vertical image indicator follows carousel scroll
+  const sc=document.getElementById('scroller'),th=document.getElementById('indThumb');
+  sc.addEventListener('scroll',()=>{const max=sc.firstElementChild.offsetHeight-543;th.style.top=(sc.scrollTop/max)*90+'px'});
+
+  // Try on -> bottom sheet
+  const sheet=document.getElementById('sheet2'),scrim=document.getElementById('scrim');
+  const sheet3=document.getElementById('sheet3');
+  function openSheet(){resetResult();sheet.classList.remove('out');sheet3.classList.remove('on');sheet.classList.add('on');scrim.classList.add('on');lock(true)}
+  const sheet6=document.getElementById('sheet6');
+  function closeSheet(){sheet.classList.remove('on','out');sheet3.classList.remove('on');sheet6.classList.remove('on');scrim.classList.remove('on');setTimeout(()=>{if(!scrim.classList.contains('on'))scrim.classList.remove('s6','s3')},320);if(!dev.classList.contains('loading')||dev.classList.contains('result'))lock(false)}
+  function openResultSheet(){scrim.classList.add('s6');sheet6.classList.add('on');scrim.classList.add('on')}
+  document.getElementById('tryonBtn').addEventListener('click',()=>{if(dev.classList.contains('added')&&!dev.classList.contains('qt')){openCloset();return}if(dev.classList.contains('result')){openResultSheet();return}if(dev.classList.contains('loading')||dev.classList.contains('qt'))return;if(hasTried)quickTryOn();else openSheet()});
+  document.getElementById('closeSheet').addEventListener('click',closeSheet);
+  document.getElementById('stories').addEventListener('click',()=>say('Style Stories (pending)'));
+  scrim.addEventListener('click',closeSheet);
+  // Continue -> swap bottom sheet to "choose a photo"
+  document.getElementById('continueBtn').addEventListener('click',()=>setTimeout(()=>{sheet.classList.add('out');scrim.classList.add('s3');sheet3.classList.add('on')},180));
+
+  document.getElementById('close6').addEventListener('click',closeSheet);
+  // Regenerate sheet: new photo -> same camera / gallery flow, then loader + result again
+  document.getElementById('optCamera6').addEventListener('click',()=>document.getElementById('optCamera').click());
+  document.getElementById('optGallery6').addEventListener('click',()=>document.getElementById('optGallery').click());
+  document.getElementById('dl6').addEventListener('click',()=>{const a=document.createElement('a');a.href=resultSrc(cur);a.download='tigc-virtual-tryon.png';document.body.appendChild(a);a.click();a.remove();say('Image saved')});
+  // ----- photo input: camera / gallery -----
+  let userPhoto=null;
+  function gotPhoto(src){userPhoto=src;window.userPhoto=src;startGenerating()}
+  let genTimers=[];
+  const dev=document.getElementById('device'),gen=document.querySelector('.slide.gen'),edge=document.getElementById('edge'),heroImg=document.getElementById('heroImg');
+  function resetResult(){genTimers.forEach(clearTimeout);genTimers=[];gen.classList.remove('reveal','done');edge.classList.remove('go');heroImg.classList.remove('reveal');heroImg.src=cur.hero;dev.classList.remove('loading','result','qt','qt-out','qt2','qt3','added','loadchip','refine','ticked','regen');
+    {const tg=document.querySelector('.tag');tg.classList.remove('swap','hide');tg.textContent='On You'}lock(false)}
+  function startGenerating(){
+    hasTried=true;
+    closeSheet();resetResult();
+    new Image().src=resultSrc(cur);              // preload the result
+    void dev.offsetWidth;dev.classList.add('loading');sc.scrollTop=0;lock(true);
+    // ~3.4s of "creating / styling / almost ready", then wipe-reveal the generated look
+    genTimers.push(setTimeout(()=>{
+      heroImg.src=resultSrc(cur);heroImg.classList.add('reveal');
+      gen.classList.add('reveal');
+    },3400));
+    genTimers.push(setTimeout(()=>{gen.classList.add('done');edge.classList.remove('go');dev.classList.add('result');lock(false)},3400+1800));
+  }
+  function readFile(f){if(!f)return;const r=new FileReader();r.onload=()=>gotPhoto(r.result);r.readAsDataURL(f)}
+  const gal=document.getElementById('galleryInput'),camIn=document.getElementById('cameraInput');
+  gal.addEventListener('change',()=>{readFile(gal.files[0]);gal.value=''});
+  camIn.addEventListener('change',()=>{readFile(camIn.files[0]);camIn.value=''});
+  document.getElementById('optGallery').addEventListener('click',()=>gal.click());
+
+  const cam=document.getElementById('cam'),vid=document.getElementById('camVideo'),camMsg=document.getElementById('camMsg');
+  let stream=null;
+  function stopCam(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}vid.srcObject=null;cam.classList.remove('on')}
+  document.getElementById('optCamera').addEventListener('click',async()=>{
+    // mobile browsers: native camera; desktop: live camera view
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){camIn.click();return}
+    cam.classList.add('on');camMsg.hidden=true;
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});vid.srcObject=stream}
+    catch(e){stopCam();camIn.click()}
+  });
+  document.getElementById('camClose').addEventListener('click',stopCam);
+  document.getElementById('shutter').addEventListener('click',()=>{
+    if(!stream)return;const c=document.getElementById('camCanvas');c.width=vid.videoWidth;c.height=vid.videoHeight;
+    const x=c.getContext('2d');x.translate(c.width,0);x.scale(-1,1);x.drawImage(vid,0,0);
+    const src=c.toDataURL('image/jpeg',.92);stopCam();gotPhoto(src)});
+
+  // button ripple
+  function ripple(btnEl,ripEl){btnEl.addEventListener('click',e=>{
+    const r=btnEl.getBoundingClientRect(),k=r.width/328;
+    ripEl.style.left=(e.clientX-r.left)/k+'px';ripEl.style.top=(e.clientY-r.top)/k+'px';
+    ripEl.classList.remove('go');void ripEl.offsetWidth;ripEl.classList.add('go');
+  })}
+  ripple(document.getElementById('addBtn'),document.getElementById('rip'));
+  ripple(document.getElementById('continueBtn'),document.getElementById('rip2'));
+
+  // ----- loader variants -----
+  const ICON='<img src="assets/ti0.svg" style="left:20.35%;top:24.83%;width:61.6%;height:51.26%"><img src="assets/ti1.svg" style="left:9.1%;top:9.09%;width:25.19%;height:22.44%"><img src="assets/ti2.svg" style="left:70.34%;top:66.91%;width:22.73%;height:22.92%"><img src="assets/ti3.svg" style="left:9.09%;top:66.93%;width:22.17%;height:22.97%"><img src="assets/ti4.svg" style="left:16.62%;top:85.55%;width:2.81%;height:1.1%"><img src="assets/ti5.svg" style="left:14.74%;top:83.89%;width:1.1%;height:1.19%"><img src="assets/ti6.svg" style="left:70.34%;top:9.09%;width:22.72%;height:22.43%"><img src="assets/ti7.svg" style="left:87.95%;top:15.23%;width:2.41%;height:15.69%"><i class="scan"></i>';
+  document.querySelectorAll('[data-icon]').forEach(e=>e.innerHTML=ICON);
+
+  // ----- Virtual Closet page -----
+  const closetEl=document.getElementById('closet');
+  (function(){ // reuse the browser header + bottom browser bar so they match every other screen
+    const hdr=document.querySelector('.browser').cloneNode(true);hdr.classList.remove('abs');hdr.style.position='absolute';
+    document.getElementById('ctop').prepend(hdr);
+    const bar=document.querySelector('.ctabar .chrome').cloneNode(true);bar.style.top='0';
+    document.getElementById('cbot').appendChild(bar);
+  })();
+  function openCloset(){
+    // no slide: drop the sheet + dim layer instantly, then fade the page in
+    sheet6.classList.add('instant');scrim.classList.add('instant');
+    closeSheet();
+    document.getElementById('cscroll').scrollTop=0;closetEl.classList.add('on');
+    setTimeout(()=>{sheet6.classList.remove('instant');scrim.classList.remove('instant')},60);
+  }
+  function closeCloset(){closetEl.classList.remove('on')}
+  document.getElementById('closet6').addEventListener('click',openCloset);
+  document.getElementById('closetBack').addEventListener('click',closeCloset);
+  document.getElementById('editAvatar').addEventListener('click',()=>say('Edit avatar (pending)'));
+  document.querySelectorAll('#looks .look').forEach(l=>{
+    l.querySelector('.rm').addEventListener('click',()=>{l.classList.add('gone');setTimeout(()=>l.remove(),250)});
+    l.querySelector('.add').addEventListener('click',()=>say('Added to bag'));
+  });
+
+  // ===== Products / PDP navigation =====
+  const SIM_TITLE="Men's Pink Slim Fit Solid Polo Collar T-shirt";
+  const mk=(img,extra)=>Object.assign({title:SIM_TITLE,price:'₹1050',mrp:'₹2,100',off:'50% OFF',best:'₹770 ',fit:'Oversized Fit',fab:'Polyester',
+    hero:img,result:img,slides:[img,img,img,img,img],card:{img,tag:'',price:'₹1050',mrp:'₹2100',off:'₹1050 OFF',best:'₹770',fit:'Oversized Fit',fab:'Polyester',title:SIM_TITLE}},extra||{});
+  const PRODUCTS={
+    p0:{id:'p0',title:"Men's Yellow Relaxed Fit Graphic Printed 240 GSM Street Wear T-Shirt",price:'₹999',mrp:'₹2,549',off:'61% OFF',best:'₹899 ',fit:'Relaxed Fit',fab:'Cotton',
+        hero:'assets/hero-overlay.png',result:'assets/res4.png',slides:['assets/hero-overlay.png','assets/red-g2.png','assets/red-g3.png','assets/red-g4.png','assets/red-g5.png'],
+        card:{img:'assets/hero-overlay.png',tag:'',price:'₹999',mrp:'₹2549',off:'₹1550 OFF',best:'₹899',fit:'Relaxed Fit',fab:'Cotton',title:"Men's Yellow Relaxed Fit Graphic Printed 240 GSM Street Wear T-Shirt"}},
+    s1:mk('assets/pdp/sim1.png',{id:'s1',result:'assets/pdp/s1-result.png',final:'assets/pdp/s1-final.png'}),
+    s2:mk('assets/pdp/sim2.png',{id:'s2'}),
+    s3:mk('assets/pdp/sim3.png',{id:'s3',best:'₹950 '})
+  };
+  PRODUCTS.s1.card.tag='BESTSELLER';PRODUCTS.s3.card.tag='BESTSELLER';PRODUCTS.s3.card.best='₹950';
+  let cur=PRODUCTS.p0;const stack=[];
+  function resultSrc(p){return (p.id==='p0'||p.id==='s1')?p.result:(userPhoto||p.result)}
+  const $=id=>document.getElementById(id);
+  const slideImgs=[...document.querySelectorAll('.strip .slide:not(.gen) img.bg:not(#heroNew)')];
+  function renderSimilar(){
+    const order=['s1','s2','s3','p0'].filter(i=>i!==cur.id).slice(0,3);
+    $('simList').innerHTML=order.map(i=>{const c=PRODUCTS[i].card;return `<div class="scard" data-pid="${i}"><div class="simg"><img src="${c.img}" alt="">${c.tag?`<span class="stag">${c.tag}</span>`:''}<button class="sbag" aria-label="Add to bag"><img src="assets/pdp/sbag.svg" alt=""></button><img class="sdots" src="assets/pdp/sdots.svg" alt=""></div><div class="stx"><div class="stg"><span>${c.fit}</span><span>${c.fab}</span></div><div class="spr"><b>${c.price}</b><s>${c.mrp}</s><em>${c.off}</em></div><div class="sbo"><i>Best Offer</i><b>${c.best}</b></div><p class="stt">${c.title}</p><div class="srt"><div class="rtg"><img src="assets/pdp/star8.svg" alt=""><div><b>4.5</b><u></u><span>300</span></div></div><div class="clr"><i style="background:#1774d1"></i><i style="background:#22890a"></i><i style="background:#000"></i><span>+1</span></div></div></div></div>`}).join('');
+    $('simList').scrollLeft=0;
+  }
+  function applyProduct(p){
+    cur=p;
+    $('pTitle').textContent=p.title;$('pPrice').textContent=p.price;$('pMrp').textContent=p.mrp;$('pOff').textContent=p.off;$('pBest').textContent=p.best;$('pFit').textContent=p.fit;$('pFab').textContent=p.fab;
+    slideImgs.forEach((im,i)=>{im.src=p.slides[i]});
+    resetResult();closeSheet();closetEl.classList.remove('on');
+    renderSimilar();
+    page.scrollTop=0;sc.scrollTop=0;
+    document.querySelectorAll('#sizeGrid .so.sel').forEach(b=>b.classList.remove('sel'));
+  }
+  function transition(fn){page.classList.add('fade');setTimeout(()=>{fn();page.classList.remove('fade')},200)}
+  function updateMenu(){$('menuIcon').src=stack.length?'assets/c-back.svg':'assets/burger.svg'}
+  function openProduct(id){if(id===cur.id)return;stack.push(cur.id);updateMenu();transition(()=>applyProduct(PRODUCTS[id]))}
+  function goBack(){const id=stack.pop();updateMenu();transition(()=>applyProduct(PRODUCTS[id]))}
+  $('menuBtn').addEventListener('click',()=>{if(stack.length)goBack()});
+  $('simList').addEventListener('click',e=>{
+    const card=e.target.closest('.scard');if(!card)return;
+    if(e.target.closest('.sbag')){say('Added to bag');return}
+    openProduct(card.dataset.pid);
+  });
+  $('sizeGrid').addEventListener('click',e=>{const b=e.target.closest('.so');if(!b||b.classList.contains('dis'))return;
+    document.querySelectorAll('#sizeGrid .so.sel').forEach(x=>x.classList.remove('sel'));b.classList.add('sel')});
+  renderSimilar();
+
+  // ===== one-tap try-on once a photo has been uploaded =====
+  let hasTried=false;
+  const heroNew=document.getElementById('heroNew'),hwrap=document.getElementById('hwrap');
+  function quickTryOn(){
+    const src=resultSrc(cur);
+    $('thumbImg').src=cur.hero;
+    lock(true);page.scrollTop=0;sc.scrollTop=0;
+    let started=false;
+    const go=()=>{
+      if(started)return;started=true;
+      const D=2600;
+      dev.classList.add('qt');                                   // result fades in beneath, tag shows
+      // one continuous motion: full image -> capsule (brief hold) -> small circle in the chip
+      const anim=hwrap.animate([
+        {left:'0px',top:'0px',width:'360px',height:'581px',borderRadius:'0px',opacity:1,offset:0,easing:'cubic-bezier(.33,0,.15,1)'},
+        {left:'143px',top:'151px',width:'188px',height:'251px',borderRadius:'85px',opacity:.62,offset:.38,easing:'linear'},
+        {left:'143px',top:'151px',width:'188px',height:'251px',borderRadius:'85px',opacity:.62,offset:.45,easing:'cubic-bezier(.6,0,.25,1)'},
+        {left:'318px',top:'416px',width:'16px',height:'16px',borderRadius:'8px',opacity:1,offset:.93,easing:'linear'},
+        {left:'318px',top:'416px',width:'16px',height:'16px',borderRadius:'8px',opacity:0,offset:1}
+      ],{duration:D,fill:'forwards'});
+      genTimers.push(setTimeout(()=>dev.classList.add('qt2','added'),Math.round(D*.44)));  // chip starts opening as the capsule leaves
+      genTimers.push(setTimeout(()=>dev.classList.add('qt3'),Math.round(D*.88)));           // circle appears inside the chip
+      genTimers.push(setTimeout(()=>{
+        anim.cancel();
+        hwrap.classList.add('nofx');heroNew.classList.add('nofx');
+        heroImg.src=src;dev.classList.remove('qt','qt2','qt3');dev.classList.add('result');
+        void hwrap.offsetWidth;hwrap.classList.remove('nofx');heroNew.classList.remove('nofx');
+        lock(false);
+        genTimers.push(setTimeout(()=>dev.classList.add('loadchip'),1300));   // 5) pill closes -> icon-only chip, scan line = loading
+        genTimers.push(setTimeout(finishLoading,1300+3200));                     // 6) loading done
+      },D+80));
+    };
+    heroNew.onload=go;heroNew.onerror=go;heroNew.src=src;
+    if(heroNew.complete)go();
+  }
+
+  // ===== loading finished: chip flips to a tick + image refines into the final avatar look =====
+  function finishLoading(){
+    const fin=cur.final||resultSrc(cur);
+    const chip=document.getElementById('tryonBtn');
+    heroNew.onload=null;heroNew.src=fin;
+    dev.classList.add('refine');                                   // final look fades in (blur -> sharp) over the current image
+    chip.animate([{transform:'perspective(260px) rotateY(0deg)'},{transform:'perspective(260px) rotateY(90deg)',offset:.5},{transform:'perspective(260px) rotateY(0deg)'}],{duration:800,easing:'cubic-bezier(.45,0,.55,1)'});
+    genTimers.push(setTimeout(()=>dev.classList.add('ticked'),400)); // swap to the tick while the chip is edge-on
+    genTimers.push(setTimeout(openRegen,1500));                       // moments later the tick opens into the Regenrate pill
+    genTimers.push(setTimeout(()=>{                                 // settle: final look becomes the first image
+      hwrap.classList.add('nofx');heroNew.classList.add('nofx');
+      heroImg.src=fin;dev.classList.remove('refine');
+      void hwrap.offsetWidth;hwrap.classList.remove('nofx');heroNew.classList.remove('nofx');
+    },1700));
+  }
+
+  function openRegen(){
+    dev.classList.remove('added','loadchip','ticked');dev.classList.add('regen');   // tick -> pill: icon + "Regenrate"
+    const tg=document.querySelector('.tag'),t=cur.card&&cur.card.tag;
+    tg.classList.add('swap');
+    setTimeout(()=>{if(t){tg.textContent=t;tg.classList.remove('swap')}else{tg.classList.remove('swap');tg.classList.add('hide')}},260);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="mdi:check-circle">
+<g id="Vector">
+<path d="M10 1.66667C5.41667 1.66667 1.66667 5.41667 1.66667 10C1.66667 14.5833 5.41667 18.3333 10 18.3333C14.5833 18.3333 18.3333 14.5833 18.3333 10C18.3333 5.41667 14.5833 1.66667 10 1.66667ZM8.33333 14.1667L4.16667 10L5.34167 8.825L8.33333 11.8083L14.6583 5.48333L15.8333 6.66667L8.33333 14.1667Z" fill="black"/>
+<path d="M10 1.66667C5.41667 1.66667 1.66667 5.41667 1.66667 10C1.66667 14.5833 5.41667 18.3333 10 18.3333C14.5833 18.3333 18.3333 14.5833 18.3333 10C18.3333 5.41667 14.5833 1.66667 10 1.66667ZM8.33333 14.1667L4.16667 10L5.34167 8.825L8.33333 11.8083L14.6583 5.48333L15.8333 6.66667L8.33333 14.1667Z" fill="url(#paint0_linear_0_4)"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_4" x1="18.3333" y1="15" x2="1.53194" y2="14.7189" gradientUnits="userSpaceOnUse">
+<stop offset="0.1" stop-color="#811978"/>
+<stop offset="0.6" stop-color="#9F277F"/>
+<stop offset="1" stop-color="#3E28AB"/>
+</linearGradient>
+</defs>
+</svg>
