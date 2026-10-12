@@ -21,6 +21,10 @@
   /* on a phone the prototype fills the whole screen (no grey frame / shadow) */
   html.phone,html.phone body{background:#fff}
   html.phone .device{box-shadow:none}
+  /* on a real phone the browser already shows a status bar, URL bar and toolbar, so hide the mock ones:
+     show only the app area (y 73 -> 740 of the 800px design) and scale it to fill the screen */
+  html.phone .stage{height:667px;margin-top:-333.5px;overflow:hidden}
+  html.phone .device{position:absolute;left:0;top:-73px}
   .page,.scroller,.closet .cscroll,.slist,.cscrl{overscroll-behavior:contain}
   input,textarea{-webkit-user-select:text;user-select:text}
   .device{position:relative;width:360px;height:800px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.25)}
@@ -1079,7 +1083,8 @@
     const phone=matchMedia('(pointer:coarse)').matches||w<=520;
     document.documentElement.classList.toggle('phone',phone);
     const pad=phone?0:24;
-    const s=Math.min((h-pad)/800,(w-pad)/360,phone?3:1);
+    const baseH=phone?667:800;
+    const s=Math.min((h-pad)/baseH,(w-pad)/360,phone?3:1);
     stage.style.transform=`scale(${s})`;
   }
   const fitSoon=()=>{cancelAnimationFrame(fitRaf);fitRaf=requestAnimationFrame(fit)};
