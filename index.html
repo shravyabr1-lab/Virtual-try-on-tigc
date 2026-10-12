@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
 <title>TIGC Virtual Try-On Prototype</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
@@ -13,9 +14,15 @@
     --feat:"salt" 1,"lnum" 1,"tnum" 1;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;background:#e9e9ec}
-  body{display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:var(--font);font-feature-settings:var(--feat);-webkit-font-smoothing:antialiased}
-  .stage{width:360px;height:800px;transform-origin:center center;flex:none}
+  html,body{position:fixed;inset:0;width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#e9e9ec;
+    -webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  body{font-family:var(--font);font-feature-settings:var(--feat);-webkit-font-smoothing:antialiased}
+  .stage{position:fixed;left:50%;top:50%;width:360px;height:800px;margin:-400px 0 0 -180px;transform-origin:center center;will-change:transform}
+  /* on a phone the prototype fills the whole screen (no grey frame / shadow) */
+  html.phone,html.phone body{background:#fff}
+  html.phone .device{box-shadow:none}
+  .page,.scroller,.closet .cscroll,.slist,.cscrl{overscroll-behavior:contain}
+  input,textarea{-webkit-user-select:text;user-select:text}
   .device{position:relative;width:360px;height:800px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.25)}
   .abs{position:absolute}
   img{display:block}
@@ -1065,8 +1072,20 @@
 <script>
   // scale the phone to fit short viewports
   const stage=document.getElementById('stage');
-  function fit(){const s=Math.min(1,(innerHeight-24)/800,(innerWidth-24)/360);stage.style.transform=`scale(${s})`;stage.style.margin=`${-(800*(1-s))/2}px ${-(360*(1-s))/2}px`}
-  addEventListener('resize',fit);fit();
+  let fitRaf=0;
+  function fit(){
+    const vv=window.visualViewport;
+    const w=Math.round(vv?vv.width:innerWidth),h=Math.round(vv?vv.height:innerHeight);
+    const phone=matchMedia('(pointer:coarse)').matches||w<=520;
+    document.documentElement.classList.toggle('phone',phone);
+    const pad=phone?0:24;
+    const s=Math.min((h-pad)/800,(w-pad)/360,phone?3:1);
+    stage.style.transform=`scale(${s})`;
+  }
+  const fitSoon=()=>{cancelAnimationFrame(fitRaf);fitRaf=requestAnimationFrame(fit)};
+  addEventListener('resize',fitSoon);addEventListener('orientationchange',fitSoon);
+  if(window.visualViewport)visualViewport.addEventListener('resize',fitSoon);
+  fit();
 
   const page=document.getElementById('page');
   function lock(b){sc.style.overflowY=b?'hidden':'auto';page.style.overflowY=b?'hidden':'auto'}
